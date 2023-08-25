@@ -31,7 +31,6 @@ sqlparse==0.2.4
 tomli==2.0.1
 tomlkit==0.11.8
 typing_extensions==4.5.0
-tzdata @ file:///tmp/build/80754af9/python-tzdata_1611693927741/work
 urllib3==1.24.2
 wincertstore==0.2
 wrapt==1.15.0
