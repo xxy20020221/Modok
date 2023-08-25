@@ -11,10 +11,13 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+MEDIA_URL = '/media/'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
@@ -41,7 +44,22 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework.authtoken",
     "Core",
+    "Chatroom",
+    "channels",
 ]
+
+# 使用channels的layer作为默认的backend
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('154.8.197.245', 6379)],
+        },
+    },
+}
+
+# 设置channels作为Django项目的首要运行方式
+ASGI_APPLICATION = 'Modok.asgi.application'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -103,14 +121,15 @@ WSGI_APPLICATION = "Modok.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
-
+import pymysql
+pymysql.install_as_MySQLdb()
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'Modok',
-        'USER': 'root',
-        'PASSWORD': 'loushang501',
-        'HOST': '127.0.0.1',
+        'USER': 'newuser',
+        'PASSWORD': 'password',
+        'HOST': '154.8.197.245',
         #'HOST': '101.43.253.121',
         'PORT': '3306',
     }
