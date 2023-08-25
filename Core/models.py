@@ -3,11 +3,23 @@ from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import *  
+from django.contrib.auth.validators import UnicodeUsernameValidator
 
 class User(AbstractUser):
-    is_customer = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
-    credits = models.IntegerField(default=100)
-    travel_num = models.IntegerField(default=0)
-    user_nickname = models.CharField(max_length=200, default=None)
-    last_recover_date = models.DateField(null=True,blank=True)
+    phone_number = models.CharField(max_length=11, null=True, blank=True)
+
+class Canvas(models.Model):
+    pass
+
+class Task(models.Model):
+    administrator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owner')
+    collaborator = models.ForeignKey(User, on_delete=models.CASCADE,related_name='collaborator')
+    viewer = models.ForeignKey(User, on_delete=models.CASCADE,related_name='viewer')
+    title = models.CharField(max_length=100)
+    description = models.CharField(max_length=1000)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    status = models.CharField(max_length=100)
+    canvas = models.ForeignKey(Canvas, on_delete=models.CASCADE, related_name='canvas')
+
+
