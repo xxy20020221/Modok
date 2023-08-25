@@ -17,3 +17,36 @@ HTTP 文件上传:
 
 使用第三方存储服务:
 如果你的应用需要频繁地上传和分享文件，可能会考虑使用第三方的文件存储服务，如Amazon S3、Google Cloud Storage等。这些服务通常提供了稳定且高效的文件上传和下载能力。用户可以先将文件上传到这些服务，然后再将文件的链接或标识符分享给其他用户。
+
+
+
+3. 私聊功能
+WebSocket
+Endpoint: ws/direct_chat/<int:receiver_user_id>/
+Consumer: DirectChatConsumer
+Methods:
+connect: 连接到WebSocket。
+disconnect: 断开WebSocket连接。
+receive: 接收客户端发送的消息并直接发送给指定用户。
+4. 消息中心
+WebSocket
+Endpoint: ws/notifications/
+Consumer: NotificationConsumer
+Methods:
+connect: 连接到WebSocket。
+disconnect: 断开WebSocket连接。
+receive: 仅用于接收服务器发送的提醒。
+HTTP RESTful API
+Endpoint: GET /notifications/
+
+Response: 显示所有@用户的消息。
+
+Endpoint: PUT /notifications/<int:notification_id>/
+
+Body: { "read": true }
+
+Response: 将消息状态设置为已读。
+
+Endpoint: DELETE /notifications/<int:notification_id>/
+
+Response: 删除选定的提醒。

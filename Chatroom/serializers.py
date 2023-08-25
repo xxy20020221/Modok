@@ -1,5 +1,18 @@
 from rest_framework import serializers
-from .models import Team, TeamMembership, ChatGroup, Message, Mention
+
+from Core.models import TeamMembership
+from .models import Team,  ChatGroup, Message, Mention
+from .models import Message, DirectMessage
+
+class MessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Message
+        fields = '__all__'
+
+class DirectMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DirectMessage
+        fields = '__all__'
 
 
 
@@ -18,10 +31,6 @@ class ChatGroupSerializer(serializers.ModelSerializer):
         model = ChatGroup
         fields = ['id', 'team', 'name']
 
-class MessageSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Message
-        fields = ['id', 'group', 'sender', 'timestamp', 'message_type', 'content', 'image', 'file']
 
 class MentionSerializer(serializers.ModelSerializer):
     class Meta:

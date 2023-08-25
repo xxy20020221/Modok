@@ -1,17 +1,17 @@
 from django.db import models
-from django.contrib.auth.models import User
+from Core.models import User, Team
 
 
-class Team(models.Model):
-    name = models.CharField(max_length=200)
-    members = models.ManyToManyField(User, through='TeamMembership')
-
-
-
-class TeamMembership(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE)
-    date_joined = models.DateTimeField(auto_now_add=True)
+# class Team(models.Model):
+#     name = models.CharField(max_length=200)
+#     members = models.ManyToManyField(User, through='TeamMembership')
+#
+#
+#
+# class TeamMembership(models.Model):
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     team = models.ForeignKey(Team, on_delete=models.CASCADE)
+#     date_joined = models.DateTimeField(auto_now_add=True)
 
 
 
@@ -60,15 +60,16 @@ class Mention(models.Model):
 
 
 class Notification(models.Model):
-    UNREAD = 'unread'
-    READ = 'read'
-    STATUS_CHOICES = [
-        (UNREAD, 'Unread'),
-        (READ, 'Read'),
-    ]
-
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    message = models.ForeignKey(Message, on_delete=models.CASCADE)
-    status = models.CharField(max_length=6, choices=STATUS_CHOICES, default=UNREAD)
+    message = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+    is_at = models.BooleanField(default=False) # 是否是@消息
+
+class DirectMessage(models.Model):
+    sender = models.ForeignKey(User, related_name="sent_direct_messages", on_delete=models.CASCADE)
+    receiver = models.ForeignKey(User, related_name="received_direct_messages", on_delete=models.CASCADE)
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
 
