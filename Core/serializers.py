@@ -1,7 +1,8 @@
 from rest_framework import serializers
-from .models import User,Task,TeamMembership,Team
+from .models import User,Task,TeamMembership,Team,Document
 from datetime import datetime
 import string
+import os 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     def create(self, validated_data):
@@ -43,10 +44,60 @@ class TeamSerializer(serializers.ModelSerializer):
         model = Team
         fields = '__all__'
 
+class ShortTeamSerializer(serializers.ModelSerializer):
+    team_id = serializers.IntegerField()
+    class Meta:
+        model = Team
+        fields = ['team_id']
+
 class TaskSerializer(serializers.ModelSerializer):
+    # team = ShortTeamSerializer(read_only=True)
+    team_id = serializers.IntegerField(write_only=True)
     class Meta:
         model = Task
+        fields = ['team_id','task_permission','title','description','expiration_date','created_date','id']
+
+    def create(self, validated_data):
+        team_id = validated_data.pop('team_id')  # Extract team_id from validated_data
+        task = Task(**validated_data)
+        
+        if team_id is not None:
+            try:
+                team = Team.objects.get(id=team_id)
+                task.team = team
+            except Team.DoesNotExist:
+                pass  # Handle the case when team_id doesn't correspond to a valid Team
+        
+        task.save()
+        return task
+
+class DocumentSerializer(serializers.ModelSerializer):
+
+    task_id = serializers.IntegerField(write_only=True)
+    creater_id = serializers.IntegerField(write_only=True)
+    class Meta:
+        model = Document
         fields = '__all__'
+
+    def create(self, validated_data):
+        task_id = validated_data.pop('task_id')  # Extract team_id from validated_data
+        creater_id = validated_data.pop('creater_id')
+        document = Document(**validated_data)
+        
+        if task_id is not None:
+            try:
+                task = Task.objects.get(id=task_id)
+                creater = User.objects.get(id=creater_id)
+                document.task = task
+                document.creater = creater
+            
+            except Task.DoesNotExist:
+                pass  # Handle the case when team_id doesn't correspond to a valid Team
+        
+        document.save()
+        return document
+
+
 
 
 
