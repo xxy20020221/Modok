@@ -11,12 +11,16 @@ from .views import (
     InviteView,
     GrantAccess,
     RevokeAccess,
+    TaskManage,
+    DocumentManage,
 )
 
 app_name = 'core'
 router = DefaultRouter()
 router.register(r'teammanage', TeamManagerView, basename='teammanage')
 router.register(r'teaminvite', InviteView, basename='teaminvite')
+router.register(r'taskmanage', TaskManage, basename='taskmanage')
+router.register(r'documentmanage', DocumentManage, basename='documentmanage')
 urlpatterns = [
     path('login/', UserLoginView.as_view(), name='login'),
     path('logout/', UserLogoutView.as_view(), name='logout'),
