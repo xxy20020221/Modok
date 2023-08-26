@@ -125,6 +125,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message_type=Message.TEXT
         )
 
+    # 看起来并没有用, but anyway!
     @database_sync_to_async
     def save_image_message(self, content):
         from Chatroom.models import Message, ChatGroup

@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import ChatMessageListView, search_group_messages, search_direct_messages, upload_file, upload_image
+from .views import ChatMessageListView, search_group_messages, search_direct_messages, \
+    UploadFileView, UploadImageView
 from . import views
 
 
@@ -9,6 +10,6 @@ urlpatterns = [
     path('chatroom/notifications/<int:notification_id>/', views.NotificationDetailView.as_view(), name='notification-detail'),
     path('chatroom/search/group/<int:team_id>/', search_group_messages, name='search-group-messages'),
     path('chatroom/search/direct/<int:sender_id>/<int:receiver_id>/', search_direct_messages, name='search-direct-messages'),
-    path('chatroom/uploadfile/', upload_file),
-    path('chatroom/uploadimage/',upload_image)
+    path('chatroom/uploadfile/', UploadFileView.as_view()),
+    path('chatroom/uploadimage/', UploadImageView.as_view()),
 ]

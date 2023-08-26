@@ -1,24 +1,28 @@
+from django.contrib.auth.decorators import login_required
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
-
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
 from .models import Message, ChatGroup, DirectMessage
 from .serializers import MessageSerializer
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
-from rest_framework.decorators import action
+from rest_framework.decorators import action, authentication_classes
 from .models import Notification
 from django.http import JsonResponse, HttpResponseBadRequest
 from .models import Message, DirectMessage, ChatGroup
 from .serializers import MessageSerializer, DirectMessageSerializer
 from django.db.models import Q
 
-def search_group_messages(request):
-    permission_classes = [AllowAny]
+def search_group_messages(request, team_id):  # 注意这里我们添加了 team_id 参数
+    permission_classes = [IsAuthenticated]
     if request.method == 'GET':
-        team_id = request.GET.get('team_id')
         keyword = request.GET.get('keyword', '')
 
         if not team_id:
@@ -37,11 +41,10 @@ def search_group_messages(request):
 
     return JsonResponse({'detail': 'Invalid request method.'}, status=400)
 
-def search_direct_messages(request):
+
+def search_direct_messages(request, sender_id, receiver_id):  #!!! 注意这里我们添加了 sender_id 和 receiver_id 参数
     permission_classes = [AllowAny]
     if request.method == 'GET':
-        sender_id = request.GET.get('sender_id')
-        receiver_id = request.GET.get('receiver_id')
         keyword = request.GET.get('keyword', '')
 
         if not sender_id or not receiver_id:
@@ -61,31 +64,43 @@ def search_direct_messages(request):
 
 
 
-def upload_file(request):
-    permission_classes = [AllowAny]
-    if request.method == "POST" and request.FILES['file']:
-        file = request.FILES['file']
-        message = Message(
-            sender=request.user,
-            file=file,
-            team_id=request.POST['team_id'],
-            message_type=Message.FILE
-        )
-        message.save()
-        return JsonResponse({'file_id': message.id})
+class UploadFileView(APIView):
+    permission_classes = [IsAuthenticated]
 
-def upload_image(request):
-    permission_classes = [AllowAny]
-    if request.method == "POST" and request.FILES['image']:
-        image = request.FILES['image']
-        message = Message(
-            sender=request.user,
-            image=image,
-            team_id=request.POST['team_id'],
-            message_type=Message.IMAGE
-        )
-        message.save()
-        return JsonResponse({'image_id': message.id})
+    def post(self, request):
+        if 'file' in request.FILES:
+            file = request.FILES['file']
+            team_id=request.data.get('team_id')
+            group_id=ChatGroup.objects.get(team_id=team_id).id
+            message = Message(
+                sender=request.user,
+                file=file,
+                group_id=group_id,
+                message_type=Message.FILE
+            )
+            message.save()
+            return Response({'file_id': message.id}, status=status.HTTP_200_OK)
+
+        return Response({'detail': 'File not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+class UploadImageView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if 'image' in request.FILES:
+            image = request.FILES['image']
+            team_id = request.data.get('team_id')
+            group_id = ChatGroup.objects.get(team_id=team_id).id
+            message = Message(
+                sender=request.user,
+                image=image,
+                group_id=group_id,
+                message_type=Message.IMAGE
+            )
+            message.save()
+            return Response({'image_id': message.id}, status=status.HTTP_200_OK)
+
+        return Response({'detail': 'Image not provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
 # 分页器, 一次加载20条消息
 class MessagePagination(PageNumberPagination):
@@ -106,8 +121,8 @@ class ChatMessageListView(ListAPIView):
         # 提供一个时间范围内的消息筛选功能, 不必须存在
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
-
-        queryset = Message.objects.filter(team_id=team_id).order_by('-created_at')
+        group_id = ChatGroup.objects.get(team_id=team_id).id
+        queryset = Message.objects.filter(group_id=group_id).order_by('timestamp')
 
         if start_date:
             queryset = queryset.filter(created_at__gte=start_date)
