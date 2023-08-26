@@ -1,5 +1,7 @@
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated, AllowAny
+
 from .models import Message, ChatGroup, DirectMessage
 from .serializers import MessageSerializer
 from django.http import JsonResponse
@@ -14,6 +16,7 @@ from .serializers import MessageSerializer, DirectMessageSerializer
 from django.db.models import Q
 
 def search_group_messages(request):
+    permission_classes = [AllowAny]
     if request.method == 'GET':
         team_id = request.GET.get('team_id')
         keyword = request.GET.get('keyword', '')
@@ -35,6 +38,7 @@ def search_group_messages(request):
     return JsonResponse({'detail': 'Invalid request method.'}, status=400)
 
 def search_direct_messages(request):
+    permission_classes = [AllowAny]
     if request.method == 'GET':
         sender_id = request.GET.get('sender_id')
         receiver_id = request.GET.get('receiver_id')
@@ -58,6 +62,7 @@ def search_direct_messages(request):
 
 
 def upload_file(request):
+    permission_classes = [AllowAny]
     if request.method == "POST" and request.FILES['file']:
         file = request.FILES['file']
         message = Message(
@@ -70,6 +75,7 @@ def upload_file(request):
         return JsonResponse({'file_id': message.id})
 
 def upload_image(request):
+    permission_classes = [AllowAny]
     if request.method == "POST" and request.FILES['image']:
         image = request.FILES['image']
         message = Message(
@@ -83,6 +89,7 @@ def upload_image(request):
 
 # 分页器, 一次加载20条消息
 class MessagePagination(PageNumberPagination):
+
     page_size = 20
     page_query_param = 'page'
     page_size_query_param = 'page_size'
@@ -94,6 +101,7 @@ class ChatMessageListView(ListAPIView):
     pagination_class = MessagePagination
 
     def get_queryset(self):
+        permission_classes = [AllowAny]
         team_id = self.kwargs.get('team_id')
         # 提供一个时间范围内的消息筛选功能, 不必须存在
         start_date = self.request.query_params.get('start_date', None)
@@ -115,6 +123,7 @@ class NotificationListView(View):
         return super().dispatch(*args, **kwargs)
 
     def get(self, request):
+        permission_classes = [AllowAny]
         user_id = request.user.id
         notifications = Notification.objects.filter(user_id=user_id).values()
         return JsonResponse(list(notifications), safe=False)
@@ -126,7 +135,7 @@ class NotificationDetailView(View):
 
     @action(detail=False, methods = ['post'])
     def put(self, request, notification_id):
-
+        permission_classes = [AllowAny]
         try:
             notification = Notification.objects.get(pk=notification_id, user_id=request.user.id)
             notification.is_read = True
@@ -137,6 +146,7 @@ class NotificationDetailView(View):
 
     @action(detail=False, methods=['delete'])
     def delete(self, request, notification_id):
+        permission_classes = [AllowAny]
         try:
             notification = Notification.objects.get(pk=notification_id, user_id=request.user.id)
             notification.delete()

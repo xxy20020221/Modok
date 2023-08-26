@@ -28,7 +28,28 @@ SECRET_KEY = "django-insecure-qt_in*#s@vx@(2!4+dhs=v0ip9o++k^##b9_eq#cqzh9cf-jap
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'channels_redis': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    },
+}
 
 
 # Application definition
@@ -49,17 +70,24 @@ INSTALLED_APPS = [
 ]
 
 # 使用channels的layer作为默认的backend
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             'hosts': [('154.8.197.245', 6379, 'jhkdjhkjdhsIUTYURT_8mcrWN')],  # 在这里指定密码
+#         },
+#     },
+# }
+# !!!
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('154.8.197.245', 6379)],
-        },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
 
+
 # 设置channels作为Django项目的首要运行方式
-ASGI_APPLICATION = 'Modok.asgi.application'
+ASGI_APPLICATION = 'Modok.routing.application'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
