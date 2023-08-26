@@ -15,6 +15,7 @@ import string
 from .models import User,Task,TeamMembership,Team
 from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
+from Chatroom.models import ChatGroup
 
 from rest_framework import generics,viewsets,permissions,status
 from rest_framework.generics import CreateAPIView
@@ -89,7 +90,11 @@ class TeamManagerView(viewsets.ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             TeamMembership.objects.create(user=request.user,team=serializer.instance,role='Creater',permission='rw')
-            return Response({"message":"success"}, status=200)
+            # Create a ChatGroup for the new Team
+            chatgroup_name = serializer.instance.title + " Chat Group"  # You can modify this naming convention
+            ChatGroup.objects.create(team=serializer.instance, name=chatgroup_name)
+
+        return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
 
