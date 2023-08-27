@@ -28,6 +28,29 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotAuthenticated,AuthenticationFailed,PermissionDenied
 from rest_framework.permissions import AllowAny,IsAuthenticated
 
+def extract_team_id_and_check_permission(type_param):
+    def decorator(view_func):
+        def _wrapped_view(view, request, *args, **kwargs):
+            team_id = request.META.get('HTTP_TEAMID')
+            if not team_id:
+                return Response({"message":"team_id not found"}, status=status.HTTP_400_BAD_REQUEST)
+            kwargs['team_id'] = team_id
+            userid = request.user.id
+            team_member = TeamMembership.objects.filter(user_id = userid,team_id=team_id).first()
+            if not team_member:
+                raise PermissionDenied()
+            role = team_member.role
+            if type_param == 'Administrator':
+                allowed_roles = ['Creater','Administrator']
+            elif type_param == 'Creater':
+                allowed_roles = ['Creater']
+            elif type_param == 'Member':
+                allowed_roles = ['Creater','Administrator','Viewer']
+            if role in allowed_roles:
+                return view_func(view, request, *args, **kwargs)
+        return _wrapped_view
+    return decorator
+
 # Create your views here.
 class UserRegisterView(APIView):
     permission_classes = [AllowAny]
@@ -113,87 +136,82 @@ class InviteView(viewsets.ModelViewSet):
     queryset = TeamMembership.objects.all()
     serializer_class = TeamMembershipSerializer
 
-    
+    @extract_team_id_and_check_permission(type_param='Administrator')
     def create(self,request):
-        if(IsTeamAdministrator(request)):
-            try:
-                user = User.objects.get(username=request.data.get('username'))
-                team = Team.objects.get(id=request.data.get('team_id'))
-            except:
-                return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = User.objects.get(username=request.data.get('username'))
+            team = Team.objects.get(id=request.data.get('team_id'))
+        except:
+            return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
 
-            
-            if TeamMembership.objects.filter(user=user,team=team).exists():
-                return Response({"message":"user already exists"}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                temp = TeamMembership.objects.create(user=user,team=team,role='Viewer',permission='r')
-                print(TeamMembershipSerializer(temp).data)
-                return Response(TeamMembershipSerializer(temp).data, status=200)
-        raise PermissionDenied()
+        
+        if TeamMembership.objects.filter(user=user,team=team).exists():
+            return Response({"message":"user already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            temp = TeamMembership.objects.create(user=user,team=team,role='Viewer',permission='r')
+            print(TeamMembershipSerializer(temp).data)
+            return Response(TeamMembershipSerializer(temp).data, status=200)
 
     
     #找所有team_id对应的成员
-    def list(self,request):
-        if(IsTeamMember(request)):
-            team_id = request.data.get('team_id')
-
-            teammembers = TeamMembership.objects.filter(team_id=team_id)
-            return Response(TeamMembershipSerializer(teammembers, many=True).data, status=200)
+    @extract_team_id_and_check_permission(type_param='Member')
+    def list(self,request,team_id=None):
+        teammembers = TeamMembership.objects.filter(team_id=team_id)
+        return Response(TeamMembershipSerializer(teammembers, many=True).data, status=200)
             
-        raise PermissionDenied()
     
 
-    
+    @extract_team_id_and_check_permission(type_param='Administrator')
     @action(detail=False, methods=['delete'])
-    def delete(self,request):
-        if(IsTeamAdministrator(request)):
-            user_id = request.data.get('user_id')
-            username = request.data.get('username')
-            team_id = request.data.get('team_id')
-            user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
-            teamMembership = TeamMembership.objects.filter(user=user,team_id=team_id).first()
-            if not teamMembership:
-                return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
+    def delete(self,request,team_id=None):
+        user_id = request.query_params.get('user_id')
+        username = request.query_params.get('username')
+        user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
+        teamMembership = TeamMembership.objects.filter(user=user,team_id=team_id).first()
+        if not teamMembership:
+            return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
 
-            if teamMembership.role == "Viewer":
-                teamMembership.delete()
-                return Response({"message":"success"}, status=200)
-            else:
-                return Response({"message":"cannot delete creater or administrator"}, status=status.HTTP_400_BAD_REQUEST)
-        raise PermissionDenied()
+        if teamMembership.role == "Viewer":
+            teamMembership.delete()
+            return Response({"message":"success"}, status=200)
+        else:
+            return Response({"message":"cannot delete creater or administrator"}, status=status.HTTP_400_BAD_REQUEST)
+
         
         
     
 # 只有创建者和管理员可以授予权限  改
 class GrantAccess(APIView):     
     permission_classes = [IsAuthenticated]
-    def post(self, request):
-        if(IsTeamAdministrator(request)):
-            type = request.data.get('type')
-            if(type=='Creater'):
-                return Response({"message":"cannot grant creater access"} , status=status.HTTP_400_BAD_REQUEST)
-            user_id = request.data.get('id')
-            team = Team.objects.get(id=request.data.get('team_id'))
-            username = request.data.get('username')
-            user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
-            TeamMembership.objects.filter(user=user,team=team).update(role=type)
-            return Response({"message":"success"}, status=200)
-        raise PermissionDenied()
+    @extract_team_id_and_check_permission(type_param='Administrator')
+    def post(self, request,team_id=None):
+
+        type = request.data.get('type')
+        if(type=='Creater'):
+            return Response({"message":"cannot grant creater access"} , status=status.HTTP_400_BAD_REQUEST)
+        user_id = request.data.get('id')
+        team = Team.objects.get(id=team_id)
+        username = request.data.get('username')
+        user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
+        TeamMembership.objects.filter(user=user,team=team).update(role=type)
+        return Response({"message":"success"}, status=200)
+
 
 #只有创建者可以撤销权限
 
 class RevokeAccess(APIView):     
     permission_classes = [IsAuthenticated]
-    def post(self, request):
-        if(IsTeamCreater(request)):
-            type = request.data.get('type')
-            user_id = request.data.get('id')
-            team = Team.objects.get(id=request.data.get('team_id'))
-            username = request.data.get('username')
-            user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
-            TeamMembership.objects.filter(user=user,team=team).update(role=type)
-            return Response({"message":"success"}, status=200)
-        raise PermissionDenied()
+    @extract_team_id_and_check_permission(type_param='Creater')
+    def post(self, request,team_id=None):
+
+        type = request.data.get('type')
+        user_id = request.data.get('id')
+        team = Team.objects.get(id=team_id)
+        username = request.data.get('username')
+        user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
+        TeamMembership.objects.filter(user=user,team=team).update(role=type)
+        return Response({"message":"success"}, status=200)
+
     
 # class TaskManagerView(viewsets.ModelViewSet):
 
@@ -203,22 +221,22 @@ class TaskManage(viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
 
-    def create(self,request):
-        if(IsTeamMember(request)):
-            # team_id = request.data.pop('team_id',None)
-            serializer = TaskSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save()
-                return Response({"message":"success"}, status=200)
-            return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
-        raise PermissionDenied()
+    @extract_team_id_and_check_permission(type_param='Member')
+    def create(self,request,team_id=None):
+
+        request.data['team_id']=team_id
+        serializer = TaskSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message":"success"}, status=200)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
     
     #缺少正在编辑时的项目保护，即有人编辑时应该无法删除
+    @extract_team_id_and_check_permission(type_param='Member')
     @action(detail=False, methods=['delete'])
-    def delete(self,request):
-        if(IsTeamMember(request)):
-            team_id = request.data.get('team_id')
-            task_id = request.data.get('task_id')
+    def delete(self,request,team_id=None):
+            task_id = request.query_params.get('task_id')
             tasks = Task.objects.filter(team_id=team_id,id=task_id).first()
             if not tasks:
                 return Response({"message":"task not found"}, status=status.HTTP_400_BAD_REQUEST)
@@ -230,7 +248,6 @@ class TaskManage(viewsets.ModelViewSet):
 
             tasks.delete()
             return Response({"message":"success"}, status=200)
-        raise PermissionDenied()
     
 
     
@@ -241,54 +258,48 @@ class DocumentManage(viewsets.ModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
 
-    def create(self,request):
-        if(IsTeamMember(request)):
-            team_id = request.data.pop('team_id',None)
-            task_id = request.data.get('task_id')
-            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
-            document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
-            request.data['document_path']=document_path
-            request.data['creater_id'] = request.user.id
-            if(os.path.exists(document_path)):
-                    return Response({"message":"document already exists"}, status=status.HTTP_400_BAD_REQUEST)
-            serializer = DocumentSerializer(data=request.data)
-            if serializer.is_valid(): 
-                serializer.save()
-                os.makedirs(dir_path,exist_ok=True)
-                with open(document_path,'w'):
-                    pass
-                return Response({"message":"success"}, status=200)
-            return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
-        raise PermissionDenied()
-    
-    def list(self,request):
-        if(IsTeamMember(request)):
-            team_id = request.data.get('team_id')
-            task_id = request.data.get('task_id')
-            documents = Document.objects.filter(task_id=task_id)
-            return Response(DocumentSerializer(documents,many=True).data,status=200)
-        raise PermissionDenied()
+    @extract_team_id_and_check_permission(type_param='Member')
+    def create(self,request,team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+        document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
+        request.data['document_path']=document_path
+        request.data['creater_id'] = request.user.id
+        if(os.path.exists(document_path)):
+                return Response({"message":"document already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = DocumentSerializer(data=request.data)
+        if serializer.is_valid(): 
+            serializer.save()
+            os.makedirs(dir_path,exist_ok=True)
+            with open(document_path,'w'):
+                pass
+            return Response({"message":"success"}, status=200)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def list(self,request,team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        documents = Document.objects.filter(task_id=task_id)
+        return Response(DocumentSerializer(documents,many=True).data,status=200)
     
     #缺少正在编辑时的项目保护，即有人编辑时应该无法删除
+    @extract_team_id_and_check_permission(type_param='Member')
     @action(detail=False, methods=['delete'])
-    def delete(self,request):
-        if(IsTeamMember(request)):
-            team_id = request.data.get('team_id')
-            task_id = request.data.get('task_id')
-            document_id = request.data.get('document_id')
-            documents = Document.objects.filter(task_id=task_id,id=document_id).first()
-            if not documents:
-                return Response({"message":"document not found"}, status=status.HTTP_400_BAD_REQUEST)
-            #移入垃圾桶
-            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
-            document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
-            recycle_path = os.path.join(os.path.abspath('.'),'recycle',team_id)
-            os.makedirs(recycle_path,exist_ok=True)
-            move_file(document_path,recycle_path)
+    def delete(self,request,team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        document_id = request.query_params.get('document_id')
+        documents = Document.objects.filter(task_id=task_id,id=document_id).first()
+        if not documents:
+            return Response({"message":"document not found"}, status=status.HTTP_400_BAD_REQUEST)
+        #移入垃圾桶
+        dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+        document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
+        recycle_path = os.path.join(os.path.abspath('.'),'recycle',team_id)
+        os.makedirs(recycle_path,exist_ok=True)
+        move_file(document_path,recycle_path)
 
-            documents.delete()
-            return Response({"message":"success"}, status=200)
-        raise PermissionDenied()
+        documents.delete()
+        return Response({"message":"success"}, status=200)
     
 
 
