@@ -26,6 +26,39 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotAuthenticated,AuthenticationFailed,PermissionDenied
 from rest_framework.permissions import AllowAny,IsAuthenticated
 
+def extract_team_id(view_func):
+    def _wrapped_view(view, request, *args, **kwargs):
+        # print(request.META.get('HTTP_TEAMID'))
+        team_id = request.META.get('HTTP_TEAMID')
+        kwargs['team_id'] = team_id
+        return view_func(view, request, *args, **kwargs)
+    return _wrapped_view
+
+def extract_team_id_and_check_permission(type_param):
+    def decorator(view_func):
+        def _wrapped_view(view, request, *args, **kwargs):
+            team_id = request.META.get('HTTP_TEAMID')
+            if not team_id:
+                return Response({"message":"team_id not found"}, status=status.HTTP_400_BAD_REQUEST)
+            kwargs['team_id'] = team_id
+            userid = request.user.id
+            team_member = TeamMembership.objects.filter(user_id = userid,team_id=team_id).first()
+            if not team_member:
+                raise PermissionDenied()
+            role = team_member.role
+            if type_param == 'Administrator':
+                allowed_roles = ['Creater','Administrator']
+            elif type_param == 'Creater':
+                allowed_roles = ['Creater']
+            elif type_param == 'Member':
+                allowed_roles = ['Creater','Administrator','Viewer']
+            if role in allowed_roles:
+                return view_func(view, request, *args, **kwargs)
+        return _wrapped_view
+    return decorator
+
+
+
 # Create your views here.
 class UserRegisterView(APIView):
     permission_classes = [AllowAny]
@@ -107,54 +140,50 @@ class InviteView(viewsets.ModelViewSet):
     queryset = TeamMembership.objects.all()
     serializer_class = TeamMembershipSerializer
 
-    
+    @extract_team_id_and_check_permission(type_param='Administrator')
     def create(self,request):
-        if(IsTeamAdministrator(request)):
-            try:
-                user = User.objects.get(username=request.data.get('username'))
-                team = Team.objects.get(id=request.data.get('team_id'))
-            except:
-                return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = User.objects.get(username=request.data.get('username'))
+            team = Team.objects.get(id=request.data.get('team_id'))
+        except:
+            return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
 
-            
-            if TeamMembership.objects.filter(user=user,team=team).exists():
-                return Response({"message":"user already exists"}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                temp = TeamMembership.objects.create(user=user,team=team,role='Viewer',permission='r')
-                print(TeamMembershipSerializer(temp).data)
-                return Response(TeamMembershipSerializer(temp).data, status=200)
-        raise PermissionDenied()
+        
+        if TeamMembership.objects.filter(user=user,team=team).exists():
+            return Response({"message":"user already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            temp = TeamMembership.objects.create(user=user,team=team,role='Viewer',permission='r')
+            print(TeamMembershipSerializer(temp).data)
+            return Response(TeamMembershipSerializer(temp).data, status=200)
+
 
     
     #找所有team_id对应的成员
-    def list(self,request):
-        if(IsTeamMember(request)):
-            team_id = request.data.get('team_id')
-
-            teammembers = TeamMembership.objects.filter(team_id=team_id)
-            return Response(TeamMembershipSerializer(teammembers, many=True).data, status=200)
-            
-        raise PermissionDenied()
-    
+    # @action(detail=False, methods=['get'], url_path='teaminvite/(?P<team_id>[^/.]+)')
+    @extract_team_id_and_check_permission(type_param='Administrator')
+    def list(self,request,team_id=None):
+        teammembers = TeamMembership.objects.filter(team_id=team_id)
+        return Response(TeamMembershipSerializer(teammembers, many=True).data, status=200)
 
     
+
+    @extract_team_id_and_check_permission(type_param='Administrator')
     @action(detail=False, methods=['delete'])
-    def delete(self,request):
-        if(IsTeamAdministrator(request)):
-            user_id = request.data.get('user_id')
-            username = request.data.get('username')
-            team_id = request.data.get('team_id')
-            user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
-            teamMembership = TeamMembership.objects.filter(user=user,team_id=team_id).first()
-            if not teamMembership:
-                return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
+    def delete(self,request,team_id=None):
 
-            if teamMembership.role == "Viewer":
-                teamMembership.delete()
-                return Response({"message":"success"}, status=200)
-            else:
-                return Response({"message":"cannot delete creater or administrator"}, status=status.HTTP_400_BAD_REQUEST)
-        raise PermissionDenied()
+        user_id = request.query_params.get('user_id')
+        username = request.query_params.get('username')
+        user = User.objects.filter(Q(id=user_id) | Q(username=username)).first()
+        teamMembership = TeamMembership.objects.filter(user=user,team_id=team_id).first()
+        if not teamMembership:
+            return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if teamMembership.role == "Viewer":
+            teamMembership.delete()
+            return Response({"message":"success"}, status=200)
+        else:
+            return Response({"message":"cannot delete creater or administrator"}, status=status.HTTP_400_BAD_REQUEST)
+
         
         
     
