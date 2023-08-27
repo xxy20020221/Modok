@@ -67,8 +67,6 @@ INSTALLED_APPS = [
     "Core",
     "Chatroom",
     "channels",
-    "InterfaceDesign",
-
 ]
 
 # 使用channels的layer作为默认的backend
@@ -95,7 +93,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    # "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -126,6 +124,8 @@ CORS_ALLOW_HEADERS = (
     'x-csrftoken',
     'x-requested-with',
     'Pragma',
+    'teamid',
+    'taskid',
 )
 
 ROOT_URLCONF = "Modok.urls"
@@ -157,9 +157,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'Modok',
-        'USER': 'newuser',
-        'PASSWORD': 'password',
-        'HOST': '154.8.197.245',
+        'USER': 'root',
+        'PASSWORD': 'loushang501',
+        'HOST': '127.0.0.1',
         #'HOST': '101.43.253.121',
         'PORT': '3306',
     }

@@ -200,6 +200,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return token.user
 
 
+
 # 私聊, 为私聊创建了一个特定的group_name，确保两个私聊的用户之间的消息不会被其他用户看到
 class DirectChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
