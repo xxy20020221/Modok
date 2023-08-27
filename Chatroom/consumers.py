@@ -67,7 +67,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = await self.get_message_by_id(message_content, Message.IMAGE)
         elif message_type == Message.FILE:
             message = await self.get_message_by_id(message_content, Message.FILE)
-
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -75,7 +74,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'message_type': message_type,
                 'content': message_content,  # This is either text or the ID for file/image.
                 'message_id': message.id,
-                'username': self.scope['user'].username
+                'username': self.scope['user'].username,
+                'user_id':self.scope['user'].id,
+                'time':message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
         )
 
@@ -105,11 +106,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message = event['content']
         message_type = event['message_type']
         username = event['username']
+        user_id = event['user_id']
+        time = event['time']
         # 发送消息到WebSocket
         await self.send(text_data=json.dumps({
             'message_type': message_type,
             'content': message,
             'username':username,
+            'user_id':user_id,
+            'time':time,
         }))
 
     @database_sync_to_async
@@ -264,17 +269,25 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
                 'message_type': message_type,
                 'content': message_content,  # This can either be text or the ID for file/image.
                 'message_id': message.id,
+                'username': self.scope['user'].username,
+                'user_id': self.scope['user'].id,
+                'time': message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
         )
 
     async def direct_message(self, event):
         message_type = event['message_type']
+        username = event['username']
         content = event['content']
-
+        user_id = event['user_id']
+        time = event['time']
         # 发送消息到WebSocket
         await self.send(text_data=json.dumps({
             'message_type': message_type,
             'content': content,
+            'username': username,
+            'user_id': user_id,
+            'time': time,
         }))
 
     @database_sync_to_async
