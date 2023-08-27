@@ -126,7 +126,7 @@ class TeamManagerView(viewsets.ModelViewSet):
         user_teams = Team.objects.filter(users=request.user)
         return Response(TeamSerializer(user_teams,many=True).data,status=200)
         
-        
+
 
 
     
@@ -137,10 +137,10 @@ class InviteView(viewsets.ModelViewSet):
     serializer_class = TeamMembershipSerializer
 
     @extract_team_id_and_check_permission(type_param='Administrator')
-    def create(self,request):
+    def create(self,request,team_id=None):
         try:
             user = User.objects.get(username=request.data.get('username'))
-            team = Team.objects.get(id=request.data.get('team_id'))
+            team = Team.objects.get(id=team_id)
         except:
             return Response({"message":"user or team not found"}, status=status.HTTP_400_BAD_REQUEST)
 
