@@ -20,7 +20,8 @@ from django.urls import path, include
 urlpatterns = [
     # path("admin/", admin.site.urls),
     path('api/', include('Core.urls', namespace='Core')),
-    path('api/', include(('Chatroom.urls', 'Chatroom'), namespace='Chatroom'))
+    path('api/', include(('Chatroom.urls', 'Chatroom'), namespace='Chatroom')),
+    path('api/', include(('InterfaceDesign.urls', 'InterfaceDesign'), namespace='InterfaceDesign')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

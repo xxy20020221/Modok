@@ -67,6 +67,8 @@ INSTALLED_APPS = [
     "Core",
     "Chatroom",
     "channels",
+    "InterfaceDesign",
+
 ]
 
 # 使用channels的layer作为默认的backend
