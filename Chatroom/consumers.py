@@ -97,7 +97,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     mention = await self.create_mention(message, user, Mention.SPECIFIC_USER)
                     await self.send_notification(user, content)
 
-
     @database_sync_to_async
     def get_message_by_id(self, content_id, message_type):
         from Chatroom.models import Message

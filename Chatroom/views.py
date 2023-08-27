@@ -20,8 +20,7 @@ from .models import Message, DirectMessage, ChatGroup
 from .serializers import MessageSerializer, DirectMessageSerializer
 from django.db.models import Q
 
-def search_group_messages(request, team_id):  # 注意这里我们添加了 team_id 参数
-    permission_classes = [IsAuthenticated]
+def search_group_messages(request, team_id):
     if request.method == 'GET':
         keyword = request.GET.get('keyword', '')
 
@@ -31,19 +30,15 @@ def search_group_messages(request, team_id):  # 注意这里我们添加了 team
         try:
             chat_group = ChatGroup.objects.get(team_id=team_id)
             messages = Message.objects.filter(group=chat_group, content__icontains=keyword)
-
-            # 使用序列化器序列化消息列表
-            serializer = MessageSerializer(messages, many=True)
-            return JsonResponse(serializer.data, safe=False)
+            data = [message_to_dict(message) for message in messages]
+            return JsonResponse(data, safe=False)
 
         except ChatGroup.DoesNotExist:
             return JsonResponse({"error": "ChatGroup not found."}, status=404)
 
     return JsonResponse({'detail': 'Invalid request method.'}, status=400)
 
-
-def search_direct_messages(request, sender_id, receiver_id):  #!!! 注意这里我们添加了 sender_id 和 receiver_id 参数
-    permission_classes = [AllowAny]
+def search_direct_messages(request, sender_id, receiver_id):
     if request.method == 'GET':
         keyword = request.GET.get('keyword', '')
 
@@ -56,11 +51,19 @@ def search_direct_messages(request, sender_id, receiver_id):  #!!! 注意这里�
             content__icontains=keyword
         )
 
-        # 使用序列化器序列化消息列表
-        serializer = DirectMessageSerializer(messages, many=True)
-        return JsonResponse(serializer.data, safe=False)
+        data = [message_to_dict(message) for message in messages]
+        return JsonResponse(data, safe=False)
 
     return JsonResponse({'detail': 'Invalid request method.'}, status=400)
+
+def message_to_dict(message):
+    return {
+        "message_type": message.message_type,
+        "content": message.content,
+        "username": message.sender.username,
+        "user_id": message.sender.id,
+        "time": message.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    }
 
 
 
