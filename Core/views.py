@@ -261,6 +261,7 @@ class DocumentManage(viewsets.ModelViewSet):
     @extract_team_id_and_check_permission(type_param='Member')
     def create(self,request,team_id=None):
         task_id = request.META.get('HTTP_TASKID')
+        request.data['task_id']=task_id
         dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
         document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
         request.data['document_path']=document_path
