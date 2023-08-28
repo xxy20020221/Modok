@@ -183,6 +183,8 @@ class NotificationDetailView(View):
             return JsonResponse({'status': 'success', 'message': 'Notification deleted.'})
         except Notification.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Notification not found.'}, status=404)
+        
+    
 
 
 

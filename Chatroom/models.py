@@ -1,5 +1,5 @@
 from django.db import models
-from Core.models import User, Team
+from Core.models import User, Team, Document
 
 # class Team(models.Model):
 #     name = models.CharField(max_length=200)
@@ -15,6 +15,22 @@ class ChatGroup(models.Model):
     team = models.OneToOneField(Team, on_delete=models.CASCADE)  # 每个团队有一个公开聊天群
     name = models.CharField(max_length=200)
 
+
+# class EditingMembers(models.Model):
+#     document = models.OneToOneField(Document,on_delete=models.CASCADE)
+#     members = models.ManyToManyField(User, through='EditingMembership')
+
+# class EditingMembership(models.Model):
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     editing_members = models.ForeignKey(EditingMembers, on_delete=models.CASCADE)
+#     date_joined = models.DateTimeField(auto_now_add=True)
+
+
+class EditMessage(models.Model):
+    content = models.TextField()
+    cursor_position = models.IntegerField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    editor = models.ForeignKey(User, on_delete=models.CASCADE)
 
 class Message(models.Model):
     TEXT = 'text'

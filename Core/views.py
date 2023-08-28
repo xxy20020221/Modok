@@ -292,15 +292,34 @@ class DocumentManage(viewsets.ModelViewSet):
         documents = Document.objects.filter(task_id=task_id,id=document_id).first()
         if not documents:
             return Response({"message":"document not found"}, status=status.HTTP_400_BAD_REQUEST)
+        document_name = documents.document_name
         #移入垃圾桶
         dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
-        document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
+        document_path = os.path.join(dir_path,''.join([document_name,'.txt']))
         recycle_path = os.path.join(os.path.abspath('.'),'recycle',team_id)
         os.makedirs(recycle_path,exist_ok=True)
         move_file(document_path,recycle_path)
 
         documents.delete()
         return Response({"message":"success"}, status=200)
+    
+    @extract_team_id_and_check_permission(type_param='Member')
+    def partial_update(self,request,pk=None,team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        request.data['task_id']=task_id
+        documents = Document.objects.filter(task_id=task_id,id=pk).first()
+        
+        document_original_name = documents.document_name
+        
+        
+        if request.data['document_name'] != document_original_name:
+            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+            document_original_path = os.path.join(dir_path,''.join([document_original_name,'.txt']))
+            print("!!!!!!!!",request.data['document_name'])
+            document_path = os.path.join(dir_path,''.join([request.data['document_name'],'.txt']))
+            os.rename(document_original_path,document_path)
+        
+        return super().partial_update(request,pk)
     
 
 

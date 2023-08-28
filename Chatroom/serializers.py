@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from Core.models import TeamMembership
 from .models import Team,  ChatGroup, Message, Mention
-from .models import Message, DirectMessage
+from .models import Message, DirectMessage,EditMessage
 
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,3 +36,8 @@ class MentionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Mention
         fields = ['id', 'message', 'mentioned_user', 'read_status']
+
+class EditMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EditMessage
+        fields = ['id', 'content', 'cursor_position', 'timestamp', 'editor']

@@ -1,11 +1,14 @@
 # Byte-compiled / optimized / DLL files
 */__pycache__/
-
+/data
+/recycle
 *.py[cod]
 *$py.class
 
 # C extensions
 *.so
+
+./Modok/settings.py
 
 # Distribution / packaging
 .Python
