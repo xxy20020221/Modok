@@ -34,6 +34,7 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
             token_key = token_param[0][1]
             try:
                 token = await database_sync_to_async(Token.objects.get)(key=token_key)
+                print("token is ",token)
                 user = await self.get_user_from_token(token)
                 self.scope['user'] = user
             except Token.DoesNotExist:
@@ -71,7 +72,6 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
         await self.redis.close()
-        await self.redis.wait_closed()
 
     async def save_document_changes(self):
         await self.send(text_data=json.dumps({
@@ -119,16 +119,33 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
             'time':time,
         }))
 
+    #对于每个文档，只保留每个用户的前10条记录
     @database_sync_to_async
     def save_text_message(self, content,cursor_position):
-        from Chatroom.models import EditMessage
+        from Chatroom.models import EditMessage,Document
 
+        document = Document.objects.get(pk=self.document_id)
 
-        return EditMessage.objects.create(
+        recent_commands = EditMessage.objects.filter(
+            editor=self.scope["user"],
+            document=document,
+        ).order_by('-timestamp')[:10]
+        
+        # Create a new EditMessage instance
+        new_message = EditMessage(
             editor=self.scope["user"],
             content=content,
             cursor_position=cursor_position,
+            document=document,
         )
+        
+        # Save the new message and delete any excess old messages
+        new_message.save()
+        if recent_commands.count() >= 10:
+            old_commands_to_delete = recent_commands[9:]
+            old_commands_to_delete.delete()
+
+        return new_message
         
         
 

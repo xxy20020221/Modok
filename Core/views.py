@@ -228,6 +228,9 @@ class TaskManage(viewsets.ModelViewSet):
         serializer = TaskSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
+            task_id = serializer.data.get('id')
+            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+            os.makedirs(dir_path,exist_ok=True)
             return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
@@ -311,13 +314,13 @@ class DocumentManage(viewsets.ModelViewSet):
         
         document_original_name = documents.document_name
         
-        
-        if request.data['document_name'] != document_original_name:
-            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
-            document_original_path = os.path.join(dir_path,''.join([document_original_name,'.txt']))
-            print("!!!!!!!!",request.data['document_name'])
-            document_path = os.path.join(dir_path,''.join([request.data['document_name'],'.txt']))
-            os.rename(document_original_path,document_path)
+        if 'document_name' in request.data.keys():
+            if request.data['document_name'] != document_original_name:
+                dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+                document_original_path = os.path.join(dir_path,''.join([document_original_name,'.txt']))
+                print("!!!!!!!!",request.data['document_name'])
+                document_path = os.path.join(dir_path,''.join([request.data['document_name'],'.txt']))
+                os.rename(document_original_path,document_path)
         
         return super().partial_update(request,pk)
     
