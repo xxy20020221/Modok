@@ -142,8 +142,10 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
         # Save the new message and delete any excess old messages
         new_message.save()
         if recent_commands.count() >= 10:
+            print("need to delete!!!!!!!!!!!!!!!!!!!!!!!!!!")
             old_commands_to_delete = recent_commands[9:]
-            old_commands_to_delete.delete()
+            for old_command in old_commands_to_delete:
+                old_command.delete()
 
         return new_message
         

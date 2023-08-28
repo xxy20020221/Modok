@@ -229,7 +229,7 @@ class TaskManage(viewsets.ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             task_id = serializer.data.get('id')
-            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,str(task_id))
             os.makedirs(dir_path,exist_ok=True)
             return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
