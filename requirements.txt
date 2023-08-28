@@ -1,3 +1,4 @@
+aioredis==2.0.1
 asgiref==3.7.2
 astroid==2.15.4
 async-timeout==4.0.3
@@ -9,6 +10,7 @@ cffi==1.15.1
 channels==4.0.0
 channels-redis==4.1.0
 chardet==3.0.4
+charset-normalizer==3.2.0
 colorama==0.4.6
 constantly==15.1.0
 cryptography==40.0.2
@@ -44,8 +46,26 @@ pylint-django==2.5.3
 pylint-plugin-utils==0.7
 PyMySQL==1.0.3
 pyOpenSSL==23.2.0
+python-dateutil==2.8.2
 python-decouple==3.1
 pytz==2018.5
+redis==5.0.0
+requests==2.31.0
+service-identity==23.1.0
+six==1.16.0
+sockjs-tornado==1.0.7
+sqlparse==0.4.4
+SwampDragon==0.4.2.2
+tomli==2.0.1
+tomlkit==0.11.8
+tornado==6.3.3
+tornado-redis==2.4.18
+Twisted==22.10.0
+twisted-iocpsupport==1.0.4
+txaio==23.1.1
+typing_extensions==4.5.0
+tzdata @ file:///tmp/build/80754af9/python-tzdata_1611693927741/work
+urllib3==1.24.2
 wincertstore==0.2
 wrapt==1.15.0
 yapf==0.40.1
