@@ -31,6 +31,7 @@ class EditMessage(models.Model):
     cursor_position = models.IntegerField()
     timestamp = models.DateTimeField(auto_now_add=True)
     editor = models.ForeignKey(User, on_delete=models.CASCADE)
+    document = models.ForeignKey(Document, on_delete=models.CASCADE)
 
 class Message(models.Model):
     TEXT = 'text'

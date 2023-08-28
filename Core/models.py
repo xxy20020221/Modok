@@ -62,6 +62,8 @@ class Document(models.Model):
     creater = models.ForeignKey(User,on_delete=models.CASCADE,related_name='creater',blank=True,null=True)
     last_editor = models.ForeignKey(User,on_delete=models.CASCADE,related_name='last_editor',blank=True,null=True)
     write_permission = models.CharField(max_length=100,choices=write_permission_choices,default='1')
+    write_code = models.CharField(max_length=100,blank=True,null=True)
+    read_code = models.CharField(max_length=100,blank=True,null=True)
 
 
 
