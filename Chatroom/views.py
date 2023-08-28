@@ -73,8 +73,8 @@ class UploadFileView(APIView):
     def post(self, request):
         if 'file' in request.FILES:
             file = request.FILES['file']
-            team_id=request.data.get('team_id')
-            group_id=ChatGroup.objects.get(team_id=team_id).id
+            team_id = request.data.get('team_id')
+            group_id = ChatGroup.objects.get(team_id=team_id).id
             message = Message(
                 sender=request.user,
                 file=file,
@@ -82,9 +82,16 @@ class UploadFileView(APIView):
                 message_type=Message.FILE
             )
             message.save()
-            return Response({'file_id': message.id}, status=status.HTTP_200_OK)
+
+            # 获取文件的URL
+            file_url = settings.MEDIA_URL + str(message.file)
+
+            return Response({'file_url': file_url}, status=status.HTTP_200_OK)
 
         return Response({'detail': 'File not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+from django.conf import settings
 
 class UploadImageView(APIView):
     permission_classes = [IsAuthenticated]
@@ -101,9 +108,14 @@ class UploadImageView(APIView):
                 message_type=Message.IMAGE
             )
             message.save()
-            return Response({'image_id': message.id}, status=status.HTTP_200_OK)
+
+            # 获取图片的URL
+            image_url = settings.MEDIA_URL + str(message.image)
+
+            return Response({'message_id': image_url}, status=status.HTTP_200_OK)
 
         return Response({'detail': 'Image not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 # 分页器, 一次加载20条消息
 class MessagePagination(PageNumberPagination):
