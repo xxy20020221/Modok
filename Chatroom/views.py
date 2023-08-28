@@ -19,6 +19,7 @@ from django.http import JsonResponse, HttpResponseBadRequest
 from .models import Message, DirectMessage, ChatGroup
 from .serializers import MessageSerializer, DirectMessageSerializer
 from django.db.models import Q
+from Core.models import User
 
 def search_group_messages(request, team_id):
     if request.method == 'GET':
@@ -56,7 +57,7 @@ def search_direct_messages(request, sender_id, receiver_id):
 
             data = [message_to_dict(message) for message in messages]
             return JsonResponse(data, safe=False)
-        
+
         messages = DirectMessage.objects.filter(
             Q(sender_id=sender_id, receiver_id=receiver_id) |
             Q(sender_id=receiver_id, receiver_id=sender_id),
@@ -78,14 +79,18 @@ def message_to_dict(message):
     }
 
 
-
 class UploadFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if 'file' in request.FILES:
-            file = request.FILES['file']
-            team_id = request.data.get('team_id')
+        if 'file' not in request.FILES:
+            return Response({'detail': 'File not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        file = request.FILES['file']
+        team_id = request.data.get('team_id', None)
+        receiver_id = request.data.get('receiver_id', None)
+
+        if team_id:  # Save to Message table
             group_id = ChatGroup.objects.get(team_id=team_id).id
             message = Message(
                 sender=request.user,
@@ -94,24 +99,38 @@ class UploadFileView(APIView):
                 message_type=Message.FILE
             )
             message.save()
-
-            # 获取文件的URL
             file_url = settings.MEDIA_URL + str(message.file)
-
+            return Response({'file_url': file_url}, status=status.HTTP_200_OK)
+        elif receiver_id:  # Save to DirectMessage table
+            receiver = User.objects.get(pk=receiver_id)
+            direct_message = DirectMessage(
+                sender=request.user,
+                receiver=receiver,
+                file=file,
+                message_type=DirectMessage.FILE
+            )
+            direct_message.save()
+            file_url = settings.MEDIA_URL + str(direct_message.file)
             return Response({'file_url': file_url}, status=status.HTTP_200_OK)
 
-        return Response({'detail': 'File not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': 'Both team_id and receiver_id are missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 from django.conf import settings
+
 
 class UploadImageView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if 'image' in request.FILES:
-            image = request.FILES['image']
-            team_id = request.data.get('team_id')
+        if 'image' not in request.FILES:
+            return Response({'detail': 'Image not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        image = request.FILES['image']
+        team_id = request.data.get('team_id', None)
+        receiver_id = request.data.get('receiver_id', None)
+
+        if team_id:  # Save to Message table
             group_id = ChatGroup.objects.get(team_id=team_id).id
             message = Message(
                 sender=request.user,
@@ -120,13 +139,21 @@ class UploadImageView(APIView):
                 message_type=Message.IMAGE
             )
             message.save()
-
-            # 获取图片的URL
             image_url = settings.MEDIA_URL + str(message.image)
+            return Response({'image_url': image_url}, status=status.HTTP_200_OK)
+        elif receiver_id:  # Save to DirectMessage table
+            receiver = User.objects.get(pk=receiver_id)
+            direct_message = DirectMessage(
+                sender=request.user,
+                receiver=receiver,
+                image=image,
+                message_type=DirectMessage.IMAGE
+            )
+            direct_message.save()
+            image_url = settings.MEDIA_URL + str(direct_message.image)
+            return Response({'image_url': image_url}, status=status.HTTP_200_OK)
 
-            return Response({'message_id': image_url}, status=status.HTTP_200_OK)
-
-        return Response({'detail': 'Image not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': 'Both team_id and receiver_id are missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # 分页器, 一次加载20条消息
