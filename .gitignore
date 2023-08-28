@@ -8,7 +8,7 @@
 # C extensions
 *.so
 
-settings.py
+./Modok/settings.py
 
 # Distribution / packaging
 .Python
