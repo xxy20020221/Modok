@@ -292,7 +292,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def get_all_users(self):
         from Core.models import Team
         team = Team.objects.get(pk=self.scope['url_route']['kwargs']['team_id'])
-        return team.users.all()
+        return list(team.users.all())  # 将查询集转换为列表
 
     async def send_notification(self, user, message_content):
         # 使用channel layer广播通知
