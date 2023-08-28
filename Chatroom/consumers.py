@@ -6,6 +6,10 @@ from channels.layers import get_channel_layer
 from channels.db import database_sync_to_async
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import AnonymousUser
+
+from Chatroom.models import DirectMessage
+
+
 # import logging
 #
 # logger = logging.getLogger(__name__)
@@ -401,9 +405,9 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
         if message_type == Message.TEXT:
             message = await self.save_text_message(message_content)
         elif message_type == Message.IMAGE:
-            message = await self.get_message_by_id(message_content, Message.IMAGE)
+            message = await self.get_direct_message_by_id(message_content, Message.IMAGE)
         elif message_type == Message.FILE:
-            message = await self.get_message_by_id(message_content, Message.FILE)
+            message = await self.get_direct_message_by_id(message_content, Message.FILE)
 
         await self.channel_layer.group_send(
             self.group_name,
@@ -437,8 +441,17 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
     def get_message_by_id(self, content_id, message_type):
         from Chatroom.models import Message
         relative_image_path = content_id.split('/media/')[-1]
-        return Message.objects.get(image=relative_image_path, message_type=message_type)
+        print(content_id)
+        print( relative_image_path)
+        return Message.objects.get(content=relative_image_path, message_type=message_type)
 
+    @database_sync_to_async
+    def get_direct_message_by_id(self, content_id, message_type):
+        from Chatroom.models import Message
+        relative_image_path = content_id.split('/media/')[-1]
+        print(content_id)
+        print(relative_image_path)
+        return DirectMessage.objects.get(content=relative_image_path, message_type=message_type)
     @database_sync_to_async
     def save_text_message(self, content):
         from Chatroom.models import DirectMessage

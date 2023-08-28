@@ -99,8 +99,11 @@ class UploadFileView(APIView):
                 message_type=Message.FILE
             )
             message.save()
+            message.content = str(message.file)  # 使用保存后的对象的file字段来更新content字段
+            message.save(update_fields=['content'])  # 只更新content字段
             file_url = settings.MEDIA_URL + str(message.file)
             return Response({'file_url': file_url}, status=status.HTTP_200_OK)
+
         elif receiver_id:  # Save to DirectMessage table
             receiver = User.objects.get(pk=receiver_id)
             direct_message = DirectMessage(
@@ -110,10 +113,13 @@ class UploadFileView(APIView):
                 message_type=DirectMessage.FILE
             )
             direct_message.save()
+            direct_message.content = str(direct_message.file)  # 使用保存后的对象的file字段来更新content字段
+            direct_message.save(update_fields=['content'])  # 只更新content字段
             file_url = settings.MEDIA_URL + str(direct_message.file)
             return Response({'file_url': file_url}, status=status.HTTP_200_OK)
 
         return Response({'detail': 'Both team_id and receiver_id are missing.'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 from django.conf import settings
@@ -139,8 +145,11 @@ class UploadImageView(APIView):
                 message_type=Message.IMAGE
             )
             message.save()
+            message.content = str(message.image)  # 使用保存后的对象的image字段来更新content字段
+            message.save(update_fields=['content'])  # 只更新content字段
             image_url = settings.MEDIA_URL + str(message.image)
             return Response({'image_url': image_url}, status=status.HTTP_200_OK)
+
         elif receiver_id:  # Save to DirectMessage table
             receiver = User.objects.get(pk=receiver_id)
             direct_message = DirectMessage(
@@ -150,10 +159,10 @@ class UploadImageView(APIView):
                 message_type=DirectMessage.IMAGE
             )
             direct_message.save()
+            direct_message.content = str(direct_message.image)  # 使用保存后的对象的image字段来更新content字段
+            direct_message.save(update_fields=['content'])  # 只更新content字段
             image_url = settings.MEDIA_URL + str(direct_message.image)
             return Response({'image_url': image_url}, status=status.HTTP_200_OK)
-
-        return Response({'detail': 'Both team_id and receiver_id are missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # 分页器, 一次加载20条消息
