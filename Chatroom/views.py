@@ -26,7 +26,11 @@ def search_group_messages(request, team_id):
 
         if not team_id:
             return HttpResponseBadRequest("team_id parameter is required.")
-
+        if not keyword:
+            chat_group = ChatGroup.objects.get(team_id=team_id)
+            messages = Message.objects.filter(group=chat_group)
+            data = [message_to_dict(message) for message in messages]
+            return JsonResponse(data, safe=False)
         try:
             chat_group = ChatGroup.objects.get(team_id=team_id)
             messages = Message.objects.filter(group=chat_group, content__icontains=keyword)
@@ -44,7 +48,15 @@ def search_direct_messages(request, sender_id, receiver_id):
 
         if not sender_id or not receiver_id:
             return HttpResponseBadRequest("Both sender_id and receiver_id parameters are required.")
+        if not keyword:
+            messages = DirectMessage.objects.filter(
+                Q(sender_id=sender_id, receiver_id=receiver_id) |
+                Q(sender_id=receiver_id, receiver_id=sender_id),
+            )
 
+            data = [message_to_dict(message) for message in messages]
+            return JsonResponse(data, safe=False)
+        
         messages = DirectMessage.objects.filter(
             Q(sender_id=sender_id, receiver_id=receiver_id) |
             Q(sender_id=receiver_id, receiver_id=sender_id),
