@@ -95,7 +95,7 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
                 'message_type': message_type,
                 'content': message_content,  # This is either text or the ID for file/image.
                 'cursor_position':cursor_position,
-                'message_id': message.id,
+                # 'message_id': message.id,
                 'username': self.scope['user'].username,
                 'user_id':self.scope['user'].id,
                 'time':message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
@@ -213,12 +213,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'type': 'chat_message',
                 'message_type': message_type,
                 'content': message_content,  # This is either text or the ID for file/image.
-                'message_id': message.id,
+                # 'message_id': message.id,
                 'username': self.scope['user'].username,
                 'user_id':self.scope['user'].id,
                 'time':message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             }
         )
+
+
+    async def chat_message(self, event):
+        message = event['content']
+        message_type = event['message_type']
+        username = event['username']
+        user_id = event['user_id']
+        time = event['time']
+        # 发送消息到WebSocket
+        await self.send(text_data=json.dumps({
+            'message_type': message_type,
+            'content': message,
+            'username':username,
+            'user_id':user_id,
+            'time':time,
+        }))
 
     async def handle_mentions(self, content, message):
         from Chatroom.models import Mention
@@ -240,21 +256,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_message_by_id(self, content_id, message_type):
         from Chatroom.models import Message
-        return Message.objects.get(pk=content_id, message_type=message_type)
-    async def chat_message(self, event):
-        message = event['content']
-        message_type = event['message_type']
-        username = event['username']
-        user_id = event['user_id']
-        time = event['time']
-        # 发送消息到WebSocket
-        await self.send(text_data=json.dumps({
-            'message_type': message_type,
-            'content': message,
-            'username':username,
-            'user_id':user_id,
-            'time':time,
-        }))
+        relative_image_path = content_id.split('/media/')[-1]
+        return Message.objects.get(image= relative_image_path, message_type=message_type)
 
     @database_sync_to_async
     def save_text_message(self, content):
@@ -309,7 +312,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def get_all_users(self):
         from Core.models import Team
         team = Team.objects.get(pk=self.scope['url_route']['kwargs']['team_id'])
-        return team.users.all()
+        return list(team.users.all())  # 将查询集转换为列表
 
     async def send_notification(self, user, message_content):
         # 使用channel layer广播通知
@@ -408,7 +411,7 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
                 'type': 'direct_message',
                 'message_type': message_type,
                 'content': message_content,  # This can either be text or the ID for file/image.
-                'message_id': message.id,
+                # 'message_id': message.id,
                 'username': self.scope['user'].username,
                 'user_id': self.scope['user'].id,
                 'time': message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
@@ -432,8 +435,9 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_message_by_id(self, content_id, message_type):
-        from Chatroom.models import DirectMessage
-        return DirectMessage.objects.get(pk=content_id, message_type=message_type)
+        from Chatroom.models import Message
+        relative_image_path = content_id.split('/media/')[-1]
+        return Message.objects.get(image=relative_image_path, message_type=message_type)
 
     @database_sync_to_async
     def save_text_message(self, content):

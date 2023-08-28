@@ -158,10 +158,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'Modok',
-        'USER': 'root',
-        'PASSWORD': 'loushang501',
-        'HOST': '127.0.0.1',
-        #'HOST': '101.43.253.121',
+        'USER': 'newuser',
+        'PASSWORD': 'password',
+        'HOST': '154.8.197.245',
         'PORT': '3306',
     }
 }
