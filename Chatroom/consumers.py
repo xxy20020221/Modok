@@ -1,5 +1,5 @@
 import json
-
+import aioredis
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.layers import get_channel_layer
@@ -12,6 +12,129 @@ from django.contrib.auth.models import AnonymousUser
 
 
 # 导入模型必须在函数内部导入!!!不能在这里导入!!!!!!!
+class LiveEditingConsumer(AsyncWebsocketConsumer):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.redis = None
+    
+    async def async_setup(self):
+        self.redis = self.redis = await aioredis.from_url('redis://localhost', max_connections=10)
+
+    async def connect(self):
+        await self.async_setup()
+        self.document_id = self.scope['url_route']['kwargs']['document_id']
+        self.group_name = "live_editing_" + str(self.document_id)
+
+        # Extract token from query string
+        query_string = self.scope['query_string'].decode('utf-8')
+        token_param = [param.split('=') for param in query_string.split('&') if param.startswith('token=')]
+
+        if token_param and len(token_param[0]) > 1:
+            token_key = token_param[0][1]
+            try:
+                token = await database_sync_to_async(Token.objects.get)(key=token_key)
+                user = await self.get_user_from_token(token)
+                self.scope['user'] = user
+            except Token.DoesNotExist:
+                self.scope['user'] = AnonymousUser()
+                # logger.error(f"Invalid token provided: {token_key}")  # 添加日志记录
+
+        # If user is authenticated, proceed with the connection, else close the connection
+        if self.scope['user'].is_authenticated:
+            await self.redis.sadd(self.group_name, self.scope['user'].id)
+            await self.channel_layer.group_add(
+                self.group_name,
+                self.channel_name
+            )
+            await self.accept()
+        else:
+            # logger.error(f"WebSocket connection rejected for user: {self.scope['user']}")  # 添加日志记录
+            await self.close()
+
+    async def get_editing_users(self):
+        users = await self.redis.smembers(self.group_name)
+        return [int(user_id) for user_id in users]
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "group_name"):
+            await self.redis.srem(self.group_name, self.scope['user'].id)
+            count = await self.redis.scard(self.group_name)
+            
+            if count == 0:
+                # Save modifications to the document
+                # Save the document path and the changes, and then destroy the Redis set
+                await self.save_document_changes()
+                await self.redis.delete(self.group_name)
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name
+            )
+        await self.redis.close()
+        await self.redis.wait_closed()
+
+    async def save_document_changes(self):
+        await self.send(text_data=json.dumps({
+        'message': 'finished'
+    }))
+
+    async def receive(self, text_data):
+        text_data_json = json.loads(text_data)
+
+        message_type = text_data_json['type']
+        message_content = text_data_json['content']
+        cursor_position = text_data_json['cursor_position']
+
+
+        message = await self.save_text_message(message_content,cursor_position)
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                'type': 'chat_message',
+                'message_type': message_type,
+                'content': message_content,  # This is either text or the ID for file/image.
+                'cursor_position':cursor_position,
+                'message_id': message.id,
+                'username': self.scope['user'].username,
+                'user_id':self.scope['user'].id,
+                'time':message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+        )
+
+    async def chat_message(self, event):
+        message = event['content']
+        message_type = event['message_type']
+        username = event['username']
+        user_id = event['user_id']
+        time = event['time']
+        cursor_position = event['cursor_position']
+        # 发送消息到WebSocket
+        await self.send(text_data=json.dumps({
+            'message_type': message_type,
+            'content': message,
+            'cursor_position':cursor_position,
+            'username':username,
+            'user_id':user_id,
+            'time':time,
+        }))
+
+    @database_sync_to_async
+    def save_text_message(self, content,cursor_position):
+        from Chatroom.models import EditMessage
+
+
+        return EditMessage.objects.create(
+            editor=self.scope["user"],
+            content=content,
+            cursor_position=cursor_position,
+        )
+        
+        
+
+    @database_sync_to_async
+    def get_user_from_token(self, token):
+        return token.user
 
 # 群聊
 class ChatConsumer(AsyncWebsocketConsumer):

@@ -96,6 +96,16 @@ class DocumentSerializer(serializers.ModelSerializer):
         
         document.save()
         return document
+    
+    # def update(self, instance, validated_data):
+    #     # 在局部更新时，只更新传递的字段
+    #     task_id = validated_data.get('task_id')
+    #     # creater_id = validated_data.get('creater_id')
+    #     if task_id is not None:
+    #         instance.task_id = task_id
+    #     instance.save()
+    #     instance = super.update()
+    #     return instance
 
 
 
