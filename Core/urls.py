@@ -13,6 +13,7 @@ from .views import (
     RevokeAccess,
     TaskManage,
     DocumentManage,
+    DucliplateTask,
 )
 
 app_name = 'core'
@@ -28,6 +29,7 @@ urlpatterns = [
     path('userchange/', UserChangeView.as_view(), name='userchange'),
     path('grant/', GrantAccess.as_view(), name='grant'),
     path('revoke/', RevokeAccess.as_view(), name='revoke'),
+    path('duplicate/',DucliplateTask,name='duplicate'),
 
 ]+router.urls
 

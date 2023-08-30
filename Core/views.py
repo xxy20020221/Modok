@@ -17,7 +17,7 @@ from Chatroom.models import ChatGroup
 from .models import User,Task,TeamMembership,Team,Document
 from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
-from .support import move_files,move_file
+from .support import move_files,move_file,move_files_recursively,copy_contents
 
 from rest_framework import generics,viewsets,permissions,status
 from rest_framework.generics import CreateAPIView
@@ -125,6 +125,26 @@ class TeamManagerView(viewsets.ModelViewSet):
     def list(self,request):
         user_teams = Team.objects.filter(users=request.user)
         return Response(TeamSerializer(user_teams,many=True).data,status=200)
+    
+    @action(detail=False, methods=['delete'])
+    def delete(self,request):
+        team_id = request.query_params.get('team_id')
+        team = Team.objects.filter(id=team_id).first()
+        userid = request.user.id
+        team_member = TeamMembership.objects.filter(user_id = userid,team_id=team_id).first()
+        if not team_member:
+            raise PermissionDenied()
+        if team_member.role != 'Creater':
+            raise PermissionDenied()
+
+        #删除团队
+        team.delete()
+        dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id)
+        recycle_path = os.path.join(os.path.abspath('.'),'recycle',team_id)
+        move_files_recursively(dir_path,recycle_path)
+        #改，缺少原型设计的储存路径
+        return Response({"message":"success"}, status=200)
+
         
 
 
@@ -214,6 +234,25 @@ class RevokeAccess(APIView):
 
     
 # class TaskManagerView(viewsets.ModelViewSet):
+@extract_team_id_and_check_permission(type_param='Member')
+def DucliplateTask(request,team_id=None):
+    team_id = request.META.get('HTTP_TEAMID')
+    task_id = request.data.get('task_id')
+    task = Task.objects.filter(team_id=team_id,id=task_id).first()
+    task_data = TaskSerializer(task).data
+    print("task data is ",task_data)
+    task_data['title'] = task_data['title'] + "_副本"
+    task_data['id'] = None
+    serializer = TaskSerializer(data=task_data)
+    if serializer.is_valid():
+        serializer.save()
+        dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+        dest_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,str(serializer.data.get('id')))
+        copy_contents(dir_path,dest_path)
+        return Response({"message":"success"}, status=200)
+
+
+
 
 
 class TaskManage(viewsets.ModelViewSet):
@@ -269,6 +308,7 @@ class DocumentManage(viewsets.ModelViewSet):
         document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
         request.data['document_path']=document_path
         request.data['creater_id'] = request.user.id
+        request.data['last_editor_id'] = request.user.id
         if(os.path.exists(document_path)):
                 return Response({"message":"document already exists"}, status=status.HTTP_400_BAD_REQUEST)
         serializer = DocumentSerializer(data=request.data)
@@ -284,7 +324,10 @@ class DocumentManage(viewsets.ModelViewSet):
     def list(self,request,team_id=None):
         task_id = request.META.get('HTTP_TASKID')
         documents = Document.objects.filter(task_id=task_id)
-        return Response(DocumentSerializer(documents,many=True).data,status=200)
+        final_data = DocumentSerializer(documents,many=True).data
+        final_data['creater_username']=User.objects.filter(id=final_data['creater_id']).first().username
+        final_data['last_editor_username']=User.objects.filter(id=final_data['last_editor_id']).first().username
+        return Response(final_data,status=200)
     
     #缺少正在编辑时的项目保护，即有人编辑时应该无法删除
     @extract_team_id_and_check_permission(type_param='Member')
