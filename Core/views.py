@@ -614,7 +614,7 @@ class RecycleBinView(APIView):
                 dir_files = [f for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
                 directories[item] = dir_files
 
-        return JsonResponse({"filenames": filenames, "directories": directories}, status=200)
+        return JsonResponse({"filenames": files, "directories": directories}, status=200)
 
 
 
