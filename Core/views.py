@@ -10,12 +10,14 @@ from django.utils.decorators import method_decorator
 from django.utils.timezone import make_aware
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import F,Q,Subquery,OuterRef
+from django.shortcuts import get_object_or_404
+
 import string
 import os
-
-from Chatroom.models import ChatGroup
-from .models import User,Task,TeamMembership,Team,Document
-from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer
+import shutil
+from Chatroom.models import ChatGroup,ChatGroupMembership
+from .models import User,Task,TeamMembership,Team,Document,Directory
+from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer,DirectorySerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
 from .support import move_files,move_file,move_files_recursively,copy_contents
 from Chatroom.serializers import ChatGroupSerializer
@@ -24,7 +26,7 @@ from rest_framework import generics,viewsets,permissions,status
 from rest_framework.generics import CreateAPIView
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
-from rest_framework.decorators import action,api_view
+from rest_framework.decorators import action,api_view,permission_classes
 from rest_framework.response import Response
 from rest_framework.exceptions import NotAuthenticated,AuthenticationFailed,PermissionDenied
 from rest_framework.permissions import AllowAny,IsAuthenticated
@@ -119,7 +121,9 @@ class UserDetailView(APIView):
             "email": user.email,
             "phone_number": user.phone_number,
             "gender": user.gender,
-            "avatar": user.avatar.url if user.avatar else None
+            "description": user.description if user.description else "",
+            "avatar": user.avatar.url if user.avatar else None,
+            "register_date": user.register_date,
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -160,7 +164,8 @@ class TeamManagerView(viewsets.ModelViewSet):
             TeamMembership.objects.create(user=request.user,team=serializer.instance,role='Creater',permission='rw')
             # Create a ChatGroup for the new Team
             chatgroup_name = serializer.instance.title + " Chat Group"  # You can modify this naming convention
-            ChatGroup.objects.create(team=serializer.instance, name=chatgroup_name)
+            chatgroup = ChatGroup.objects.create(team=serializer.instance, name=chatgroup_name,group_manager=request.user,is_defalut_chatgroup=True)
+            ChatGroupMembership.objects.create(user = request.user, chat_group = chatgroup)
 
             return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
@@ -358,8 +363,76 @@ class TaskManage(viewsets.ModelViewSet):
             return Response({"message":"success"}, status=200)
     
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_directories_and_documents_for_task(request):
+    task_id = request.META.get('HTTP_TASKID')
+    # Fetch the task
+    try:
+        task = Task.objects.get(id=task_id)
+    except Task.DoesNotExist:
+        return Response({"error": "Task not found"}, status=404)
     
+    # Fetch directories for the task
+    directories = Directory.objects.filter(task=task)
+    directory_serializer = DirectorySerializer(directories, many=True)
     
+    # Fetch direct documents for the task (those not in any directory)
+    documents = Document.objects.filter(task=task, directory__isnull=True)
+    document_serializer = DocumentSerializer(documents, many=True)
+    
+    return Response({
+        "directories": directory_serializer.data,
+        "documents": document_serializer.data
+    }, status=200)
+    
+
+class DirectoryManage(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = Directory.objects.all()
+    serializer_class = DirectorySerializer
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def create(self, request, team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        request.data['task_id'] = task_id
+        dir_path = os.path.join(os.path.abspath('.'), 'data', 'documents', team_id, task_id, request.data.get('dir_name'))
+        request.data['dir_path'] = dir_path
+        request.data['creater_id'] = request.user.id
+        request.data['last_editor_id'] = request.user.id
+        if os.path.exists(dir_path):
+            return Response({"message": "directory already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        # print(request.data)
+        serializer = DirectorySerializer(data=request.data)
+
+        if serializer.is_valid(): 
+            serializer.save()
+            os.makedirs(dir_path, exist_ok=True)
+            return Response({"message": "success"}, status=200)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def list(self, request, team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        directories = Directory.objects.filter(task_id=task_id)
+        final_data = DirectorySerializer(directories, many=True).data
+        return Response(final_data, status=200)
+    
+    @extract_team_id_and_check_permission(type_param='Member')
+    @action(detail=False, methods=['delete'])
+    def delete(self, request, team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        directory_id = request.query_params.get('directory_id')
+        directory = Directory.objects.filter(task_id=task_id, id=directory_id).first()
+        if not directory:
+            return Response({"message": "directory not found"}, status=status.HTTP_400_BAD_REQUEST)
+        dir_path = os.path.join(os.path.abspath('.'), 'data', 'documents', team_id, task_id, directory.dir_name)
+        recycle_path = os.path.join(os.path.abspath('.'), 'recycle',directory.dir_name)
+        move_files_recursively(dir_path,recycle_path)
+
+        directory.delete()
+        return Response({"message": "success"}, status=200)
 
 class DocumentManage(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -370,7 +443,14 @@ class DocumentManage(viewsets.ModelViewSet):
     def create(self,request,team_id=None):
         task_id = request.META.get('HTTP_TASKID')
         request.data['task_id']=task_id
-        dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
+        dir_id = None
+        if 'HTTP_DIRID' in request.META.keys():
+            dir_id = request.META['HTTP_DIRID']
+            request.data['directory_id'] = dir_id
+            dir_name = Directory.objects.filter(id=dir_id).first().dir_name
+            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id,dir_name)
+        else:
+            dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
         document_path = os.path.join(dir_path,''.join([request.data.get('document_name'),'.txt']))
         request.data['document_path']=document_path
         request.data['creater_id'] = request.user.id
@@ -389,11 +469,12 @@ class DocumentManage(viewsets.ModelViewSet):
     @extract_team_id_and_check_permission(type_param='Member')
     def list(self,request,team_id=None):
         task_id = request.META.get('HTTP_TASKID')
-        documents = Document.objects.filter(task_id=task_id)
+        dir_id = request.META.get('HTTP_DIRID')
+        if dir_id:
+            documents = Document.objects.filter(task_id=task_id,directory_id = dir_id)
+        else:
+            documents = Document.objects.filter(task_id=task_id)
         final_data = DocumentSerializer(documents,many=True).data
-        for x in final_data:
-            x['creater_username']=User.objects.filter(id=x['creater']).first().username
-            x['last_editor_username']=User.objects.filter(id=x['last_editor']).first().username
         return Response(final_data,status=200)
     
     #缺少正在编辑时的项目保护，即有人编辑时应该无法删除
@@ -409,7 +490,7 @@ class DocumentManage(viewsets.ModelViewSet):
         #移入垃圾桶
         dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
         document_path = os.path.join(dir_path,''.join([document_name,'.txt']))
-        recycle_path = os.path.join(os.path.abspath('.'),'recycle',team_id)
+        recycle_path = os.path.join(os.path.abspath('.'),'recycle')
         os.makedirs(recycle_path,exist_ok=True)
         move_file(document_path,recycle_path)
 
@@ -435,12 +516,106 @@ class DocumentManage(viewsets.ModelViewSet):
         return super().partial_update(request,pk)
     
 
-@extract_team_id_and_check_permission(type_param='Member')
 @api_view(['GET'])
-def list_all_chatrooms(request,team_id=None):
-    chatgroups = ChatGroup.objects.filter(team_id = team_id)
-    return Response([ChatGroupSerializer(chatgroup).data for chatgroup in chatgroups], status=200)
-    
+def list_all_chatrooms(request):
+    team_id = request.META.get('HTTP_TEAMID')
+    team = Team.objects.filter(id=team_id).first()
+    teammember = TeamMembership.objects.filter(user = request.user,team=team)
+    if teammember:
+        chatgroups = ChatGroup.objects.filter(team_id = team_id)
+        return Response([ChatGroupSerializer(chatgroup).data for chatgroup in chatgroups], status=200)
+    raise PermissionDenied()
+
+def restore_directory_files(directory,task, root_path, target_dir_path,expiration_date):
+    """递归地恢复文件夹中的文件，并在数据库中为每一个文件创建/更新记录"""
+
+    for item_name in os.listdir(root_path):
+        current_path = os.path.join(root_path, item_name)
+        current_target_path = os.path.join(target_dir_path, item_name)
+
+        if os.path.isfile(current_path):
+            # 如果是文件，更新或创建Document记录
+            document, created = Document.objects.update_or_create(
+                task=task,
+                document_name=item_name,
+                directory=directory,
+                expiration_date=expiration_date,
+                defaults={'document_path': current_target_path}
+            )
+        
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def restore_from_recycle_bin(request):
+    # 获取从POST请求传递的数据
+    task_id = request.META.get('HTTP_TASKID')
+    item_name = request.data.get('item_name')  # 此处为文件或目录名
+    expiration_date = request.data.get('expiration_date')
+    # 根据task_id查找任务，确保任务存在
+    task = get_object_or_404(Task, pk=task_id)
+
+    # 构建原始和目标路径
+    recycle_path = os.path.join(os.path.abspath('.'), 'recycle', item_name)
+    target_path = os.path.join(os.path.abspath('.'), 'data', 'documents', str(task.team.id), str(task_id), item_name)
+
+    # 检查条目是否存在于回收站中
+    if not os.path.exists(recycle_path):
+        return JsonResponse({"message": "Item not found in recycle bin."}, status=404)
+
+
+    if os.path.isfile(recycle_path):
+        target_dir = os.path.dirname(target_path)
+        os.makedirs(target_dir, exist_ok=True)
+
+    # 检查是文件还是目录
+    if os.path.isfile(recycle_path):
+        
+        # 更新或创建Document记录
+        document, created = Document.objects.update_or_create(
+            task=task,
+            document_name=item_name,
+            expiration_date=expiration_date,
+            defaults={'document_path': target_path}
+        )
+        os.rename(recycle_path, target_path)
+    elif os.path.isdir(recycle_path):
+        # 移动整个目录
+        
+        directory = Directory.objects.create(task=task, dir_name=item_name,dir_path = target_path,expiration_date=expiration_date)
+        restore_directory_files(directory,task, recycle_path, target_path,expiration_date)
+        shutil.move(recycle_path, target_path)
+
+    return JsonResponse({"message": "Item successfully restored."}, status=200)
+
+
+class RecycleBinView(APIView):
+    permission_classes=[IsAuthenticated]
+
+    def get(self, request):
+        # 设定recycle目录的路径
+        recycle_path = os.path.join(os.path.abspath('.'), 'recycle')
+
+        # 检查目录是否存在
+        if not os.path.exists(recycle_path):
+            return JsonResponse({"message": "Recycle bin does not exist."}, status=404)
+
+        # 获取目录下所有文件的文件名（排除目录）
+        files = []
+        directories = {}
+
+        # 遍历recycle目录下的内容
+        for item in os.listdir(recycle_path):
+            item_path = os.path.join(recycle_path, item)
+            # 如果是文件，直接添加到filenames列表
+            if os.path.isfile(item_path):
+                files.append(item)
+            # 如果是目录，添加到directories字典，并列出目录中的文件
+            elif os.path.isdir(item_path):
+                dir_files = [f for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
+                directories[item] = dir_files
+
+        return JsonResponse({"filenames": filenames, "directories": directories}, status=200)
+
 
 
     

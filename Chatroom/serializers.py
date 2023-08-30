@@ -27,9 +27,23 @@ class UserTeamRoleSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'team', 'date_joined']
 
 class ChatGroupSerializer(serializers.ModelSerializer):
+    manager_details = serializers.SerializerMethodField(read_only=True)
+    members_count = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = ChatGroup
-        fields = ['id', 'team', 'name']
+        fields = ['id', 'team', 'name','manager_details','members_count']
+    
+    def get_manager_details(self, obj):
+        if obj.group_manager:
+            return {
+                "username": obj.group_manager.username,
+                "user_id": obj.group_manager.id
+            }
+        return None
+
+    def get_members_count(self, obj):
+        return obj.members.count()
+    
 
 
 class MentionSerializer(serializers.ModelSerializer):

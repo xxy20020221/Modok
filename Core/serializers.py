@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User,Task,TeamMembership,Team,Document
+from .models import User,Task,TeamMembership,Team,Document,Directory
 from datetime import datetime
 import string
 import os 
@@ -72,19 +72,26 @@ class TaskSerializer(serializers.ModelSerializer):
         task.save()
         return task
 
+
+
 class DocumentSerializer(serializers.ModelSerializer):
 
     task_id = serializers.IntegerField(write_only=True)
     creater_id = serializers.IntegerField(write_only=True)
     last_editor_id = serializers.IntegerField(write_only=True)
+    creater_name = serializers.SerializerMethodField(read_only=True)
+    last_editor_name = serializers.SerializerMethodField(read_only=True)
+    directory_id = serializers.IntegerField(write_only=True,required=False)
     class Meta:
         model = Document
         fields = '__all__'
+       
 
     def create(self, validated_data):
         task_id = validated_data.pop('task_id')  # Extract team_id from validated_data
         creater_id = validated_data.pop('creater_id')
         last_editor_id = validated_data.pop('last_editor_id')
+        directory_id = validated_data.pop('directory_id',None)
         document = Document(**validated_data)
         
         if task_id is not None:
@@ -95,12 +102,20 @@ class DocumentSerializer(serializers.ModelSerializer):
                 document.task = task
                 document.creater = creater
                 document.last_editor = last_editor
+                if directory_id:
+                    document.directory = Directory.objects.get(id=directory_id)
             
             except Task.DoesNotExist:
                 pass  # Handle the case when team_id doesn't correspond to a valid Team
         
         document.save()
         return document
+    
+    def get_creater_name(self,obj):
+        return obj.creater.username
+    
+    def get_last_editor_name(self,obj):
+        return obj.last_editor.username
     
     # def update(self, instance, validated_data):
     #     # 在局部更新时，只更新传递的字段
@@ -113,6 +128,48 @@ class DocumentSerializer(serializers.ModelSerializer):
     #     return instance
 
 
+class DirectorySerializer(serializers.ModelSerializer):
+    documents = DocumentSerializer(many=True, read_only=True)
+    task_id = serializers.IntegerField(write_only=True)
+    creater_id = serializers.IntegerField(write_only=True)
+    last_editor_id = serializers.IntegerField(write_only=True)
+    creater_name = serializers.SerializerMethodField(read_only=True)
+    last_editor_name = serializers.SerializerMethodField(read_only=True)
 
+    def create(self, validated_data):
+        task_id = validated_data.pop('task_id')  # Extract team_id from validated_data
+        creater_id = validated_data.pop('creater_id')
+        last_editor_id = validated_data.pop('last_editor_id')
+        directory = Directory(**validated_data)
+        
+        if task_id is not None:
+            
+            try:
+                
+                task = Task.objects.get(id=task_id)
+                creater = User.objects.get(id=creater_id)
+                last_editor = User.objects.get(id=last_editor_id)
+                directory.task = task
+                directory.creater = creater
+                directory.last_editor = last_editor
+            
+            except Task.DoesNotExist:
+                pass  # Handle the case when team_id doesn't correspond to a valid Team
+
+        directory.save()
+        return directory
+
+    class Meta:
+        model = Directory
+        fields = '__all__'
+        extra_kwargs = {
+            'task': {'required': False}
+        }
+
+    def get_creater_name(self,obj):
+        return obj.creater.username
+    
+    def get_last_editor_name(self,obj):
+        return obj.last_editor.username
 
 
