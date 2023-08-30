@@ -36,7 +36,8 @@ class TeamMembershipSerializer(serializers.ModelSerializer):
     def get_username(self,obj):
         return obj.user.username
 
-
+class AvatarUploadSerializer(serializers.Serializer):
+    avatar = serializers.ImageField()
 
 class TeamSerializer(serializers.ModelSerializer):
     
