@@ -40,10 +40,11 @@ def move_files_recursively(src_folder, dest_folder):
     # 遍历源文件夹中的文件和子文件夹
     for item in os.listdir(src_folder):
         src_item_path = os.path.join(src_folder, item)
-        dest_item_path = os.path.join(dest_folder, item)
+        dest_item_path = dest_folder
 
         # 如果是文件，则直接移动
         if os.path.isfile(src_item_path):
+            dest_item_path = os.path.join(dest_item_path, item)
             shutil.move(src_item_path, dest_item_path)
         # 如果是目录，则递归处理
         elif os.path.isdir(src_item_path):

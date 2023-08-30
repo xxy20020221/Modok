@@ -234,22 +234,29 @@ class RevokeAccess(APIView):
 
     
 # class TaskManagerView(viewsets.ModelViewSet):
-@extract_team_id_and_check_permission(type_param='Member')
-def DucliplateTask(request,team_id=None):
-    team_id = request.META.get('HTTP_TEAMID')
-    task_id = request.data.get('task_id')
-    task = Task.objects.filter(team_id=team_id,id=task_id).first()
-    task_data = TaskSerializer(task).data
-    print("task data is ",task_data)
-    task_data['title'] = task_data['title'] + "_副本"
-    task_data['id'] = None
-    serializer = TaskSerializer(data=task_data)
-    if serializer.is_valid():
-        serializer.save()
-        dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
-        dest_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,str(serializer.data.get('id')))
-        copy_contents(dir_path,dest_path)
-        return Response({"message":"success"}, status=200)
+class DuplicateTask(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def post(self,request,team_id=None):
+        team_id = request.META.get('HTTP_TEAMID')
+        task_id = request.data.get('task_id')
+        task = Task.objects.filter(team_id=team_id,id=task_id).first()
+        task_data = TaskSerializer(task).data
+        task_data['title'] = task_data['title'] + "_副本"
+        task_data.pop('id',None)
+        task_data.pop('created_date',None)
+        task_data.pop('task_permission',None)
+        task_data['team_id']=team_id
+        serializer = TaskSerializer(data=task_data)
+        if serializer.is_valid():
+            serializer.save()
+            dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id))
+            dest_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(serializer.data.get('id')))
+            copy_contents(dir_path,dest_path)
+            return Response({"message":"success"}, status=200)
+        raise PermissionDenied()
+
 
 
 
@@ -325,8 +332,9 @@ class DocumentManage(viewsets.ModelViewSet):
         task_id = request.META.get('HTTP_TASKID')
         documents = Document.objects.filter(task_id=task_id)
         final_data = DocumentSerializer(documents,many=True).data
-        final_data['creater_username']=User.objects.filter(id=final_data['creater_id']).first().username
-        final_data['last_editor_username']=User.objects.filter(id=final_data['last_editor_id']).first().username
+        for x in final_data:
+            x['creater_username']=User.objects.filter(id=x['creater']).first().username
+            x['last_editor_username']=User.objects.filter(id=x['last_editor']).first().username
         return Response(final_data,status=200)
     
     #缺少正在编辑时的项目保护，即有人编辑时应该无法删除
