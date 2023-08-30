@@ -50,6 +50,27 @@ class TaskList(APIView):
             serializer.save(team_id=team_id)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class TaskDetail(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, team_id, task_id):
+        try:
+            return Task.objects.get(pk=task_id, team_id=team_id)
+        except Task.DoesNotExist:
+            raise NotFound("Task not found.")
+
+    def put(self, request, team_id, task_id):
+        task = self.get_object(team_id, task_id)
+        serializer = TaskSerializer(task, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, team_id, task_id):
+        task = self.get_object(team_id, task_id)
+        task.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class PageList(APIView):
 
@@ -73,6 +94,33 @@ class PageList(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class PageDetail(APIView):
+
+    def get_permissions(self):
+        task = get_object_or_404(Task, id=self.kwargs['task_id'])
+        if task.is_shared:
+            return []
+        return [IsAuthenticated()]
+
+    def get_object(self, team_id, task_id, page_id):
+        try:
+            task = Task.objects.get(pk=task_id, team_id=team_id)
+            return Page.objects.get(pk=page_id, task=task)
+        except Page.DoesNotExist:
+            raise NotFound("Page not found.")
+
+    def put(self, request, team_id, task_id, page_id):
+        page = self.get_object(team_id, task_id, page_id)
+        serializer = PageSerializer(page, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, team_id, task_id, page_id):
+        page = self.get_object(team_id, task_id, page_id)
+        page.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class ComponentList(APIView):
 
