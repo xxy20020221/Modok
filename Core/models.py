@@ -42,6 +42,7 @@ class Task(models.Model):
     description = models.CharField(max_length=1000)
     created_date = models.DateTimeField(auto_now_add=True)
     expiration_date = models.DateTimeField(blank=True,null=True)
+    is_shared = models.BooleanField(default=False)
 
 class Canvas(models.Model):
     task = models.ForeignKey(Task,on_delete=models.CASCADE,related_name='canvastask',blank=True,null=True)
