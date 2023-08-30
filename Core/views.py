@@ -15,18 +15,20 @@ import os
 
 from Chatroom.models import ChatGroup
 from .models import User,Task,TeamMembership,Team,Document
-from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer
+from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
 from .support import move_files,move_file,move_files_recursively,copy_contents
+from Chatroom.serializers import ChatGroupSerializer
 
 from rest_framework import generics,viewsets,permissions,status
 from rest_framework.generics import CreateAPIView
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
-from rest_framework.decorators import action
+from rest_framework.decorators import action,api_view
 from rest_framework.response import Response
 from rest_framework.exceptions import NotAuthenticated,AuthenticationFailed,PermissionDenied
 from rest_framework.permissions import AllowAny,IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 def extract_team_id_and_check_permission(type_param):
     def decorator(view_func):
@@ -89,21 +91,62 @@ class UserLogoutView(APIView):
         else:
             raise NotAuthenticated("You are not logged in")
         
-class UserChangeView(APIView):
+class AvatarUploadView(APIView):
+    parser_classes = (MultiPartParser,)
     permission_classes = [IsAuthenticated]
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
+        serializer = AvatarUploadSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = request.user
+            user.avatar = serializer.validated_data['avatar']
+            user.save()
+            return Response({"message": "Avatar uploaded successfully"}, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request):
+        """
+        获取当前认证用户的详细信息。
+        """
+        user = request.user
+        data = {
+            "username": user.username,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "gender": user.gender,
+            "avatar": user.avatar.url if user.avatar else None
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        """
+        更新当前认证用户的详细信息。
+        """
+        user = request.user
         password = request.data.get('password')
-        email=request.data.get("email")
+        email = request.data.get("email")
         phone_number = request.data.get("phone_number")
-        user=request.user
-        if(password!=None):
+        gender = request.data.get("gender")
+        avatar = request.FILES.get("avatar") if "avatar" in request.FILES else None
+
+        if password:
             user.set_password(password)
-        if(email!=None):
-            user.email=email
-        if(phone_number!=None):
-            user.phone_number=phone_number
+        if email:
+            user.email = email
+        if phone_number:
+            user.phone_number = phone_number
+        if gender:
+            user.gender = gender
+        if avatar:
+            user.avatar = avatar
+
         user.save()
-        return Response({"message":"success"}, status=200)
+        return Response({"message": "success"}, status=status.HTTP_200_OK)
     
 class TeamManagerView(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -249,12 +292,28 @@ class DuplicateTask(APIView):
         task_data.pop('task_permission',None)
         task_data['team_id']=team_id
         serializer = TaskSerializer(data=task_data)
+        
         if serializer.is_valid():
-            serializer.save()
+            #创建新task
+            tmp = serializer.save()
+            task_id2 = tmp.id
+            #复制文件
             dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id))
             dest_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(serializer.data.get('id')))
             copy_contents(dir_path,dest_path)
-            return Response({"message":"success"}, status=200)
+            #复制到数据库
+            documents = Document.objects.filter(task_id=task_id)
+            for document in documents:
+                document_data = DocumentSerializer(document).data
+                document_data.pop('id',None)
+                dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id2)
+                document_path = os.path.join(dir_path,''.join([document_data['document_name'],'.txt']))
+                document_data['document_path'] = document_path
+                document2 = DocumentSerializer(data=document_data)
+                if document2.is_valid():
+                    document2.save()
+                    return Response({"message":"success"}, status=200)
+                raise PermissionDenied()
         raise PermissionDenied()
 
 
@@ -374,6 +433,13 @@ class DocumentManage(viewsets.ModelViewSet):
                 os.rename(document_original_path,document_path)
         
         return super().partial_update(request,pk)
+    
+
+@extract_team_id_and_check_permission(type_param='Member')
+@api_view(['GET'])
+def list_all_chatrooms(request,team_id=None):
+    chatgroups = ChatGroup.objects.filter(team_id = team_id)
+    return Response([ChatGroupSerializer(chatgroup).data for chatgroup in chatgroups], status=200)
     
 
 
