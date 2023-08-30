@@ -38,6 +38,27 @@ class GetChatGroupUsers(APIView):
 
         except ChatGroup.DoesNotExist:
             return Response({"error": "ChatGroup not found."}, status=status.HTTP_404_NOT_FOUND)
+class GetChatGroupByTeamID(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, team_id):
+        try:
+            team = Team.objects.get(pk=team_id)
+            chatgroups = ChatGroup.objects.filter(team=team)
+
+            # Serialize the chat groups to return their information.
+            # For simplicity, we will return their names and IDs in this example.
+            # You can extend this to return more information if needed.
+            chatgroup_data = [{"id": chatgroup.id, "name": chatgroup.name} for chatgroup in chatgroups]
+            return Response({"chatgroups": chatgroup_data}, status=status.HTTP_200_OK)
+
+        except Team.DoesNotExist:
+            return Response({"error": "Team not found."}, status=status.HTTP_404_NOT_FOUND)
+class GetChatGroupByTeamID(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self,requet,team_id):
+        team = Team.objects.get(pk=team_id)
+        chatgroups = ChatGroup.objects.filter(team=team)
 class CreateChatGroupView(APIView):
     permission_classes = [IsAuthenticated]
 

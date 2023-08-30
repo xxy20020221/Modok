@@ -5,6 +5,36 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Task, Page, Component
 from .serializers import TaskSerializer, PageSerializer, ComponentSerializer
+from django.shortcuts import get_object_or_404
+
+
+class SetTaskShared(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
+        team = task.team
+
+        if request.user not in team.users.all():
+            return Response({"detail": "Not authorized to modify this task."}, status=status.HTTP_403_FORBIDDEN)
+
+        task.is_shared = True
+        task.save()
+        return Response({"detail": "Task is now shared."}, status=status.HTTP_200_OK)
+
+class SetTaskPrivate(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
+        team = task.team
+
+        if request.user not in team.users.all():
+            return Response({"detail": "Not authorized to modify this task."}, status=status.HTTP_403_FORBIDDEN)
+
+        task.is_shared = False
+        task.save()
+        return Response({"detail": "Task is now private."}, status=status.HTTP_200_OK)
 
 class TaskList(APIView):
     permission_classes = [IsAuthenticated]
@@ -22,10 +52,15 @@ class TaskList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class PageList(APIView):
-    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        task = get_object_or_404(Task, id=self.kwargs['task_id'])
+        if task.is_shared:
+            return []
+        return [IsAuthenticated()]
 
     def get(self, request, team_id, task_id):
-        pages = Page.objects.filter(task_id=task_id)
+        pages = Page.objects.filter(task_id=task_id).order_by("last_modified")
         serializer = PageSerializer(pages, many=True)
         return Response(serializer.data)
 
@@ -40,7 +75,13 @@ class PageList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ComponentList(APIView):
-    permission_classes = [IsAuthenticated]
+
+
+    def get_permissions(self):
+        task = get_object_or_404(Task, id=self.kwargs['task_id'])
+        if task.is_shared:
+            return []
+        return [IsAuthenticated()]
 
     def get(self, request, team_id, task_id, page_id):
         components = Component.objects.filter(page_id=page_id)
