@@ -4,7 +4,7 @@
 /recycle
 *.py[cod]
 *$py.class
-
+Modok/settings.py
 # C extensions
 *.so
 

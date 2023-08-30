@@ -255,7 +255,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             users = await self.get_all_users()
             for user in users:
                 username = user.username
+                print("ALL username"+username)
                 if f"@{username}" in content:
+                    print("username"+username)
                     mention = await self.create_mention(message, user, Mention.SPECIFIC_USER)
                     await self.send_notification(user, content)
 
