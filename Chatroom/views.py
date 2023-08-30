@@ -26,6 +26,18 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from Core.models import Team
+
+class GetChatGroupUsers(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self,request,group_id):
+        try:
+            chatgroup = ChatGroup.objects.get(pk=group_id)
+            users = chatgroup.members.all()
+            user_data = [{"id":user.id,"username":user.name} for user in users]
+            return Response({"users": user_data}, status=status.HTTP_200_OK)
+
+        except ChatGroup.DoesNotExist:
+            return Response({"error": "ChatGroup not found."}, status=status.HTTP_404_NOT_FOUND)
 class CreateChatGroupView(APIView):
     permission_classes = [IsAuthenticated]
 
