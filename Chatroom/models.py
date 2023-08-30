@@ -12,9 +12,20 @@ from Core.models import User, Team, Document
 #     date_joined = models.DateTimeField(auto_now_add=True)
 
 class ChatGroup(models.Model):
-    team = models.OneToOneField(Team, on_delete=models.CASCADE)  # 每个团队有一个公开聊天群
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)  # 每个团队有一个公开聊天群
     name = models.CharField(max_length=200)
+    is_defalut_chatgroup = models.BooleanField(default=True)
+    group_manager = models.ForeignKey(User, on_delete=models.CASCADE, related_name="managed_groups", null=True, blank=True)
+    members = models.ManyToManyField(User, through='ChatGroupMembership', related_name="chat_groups",null=True, blank=True)
+    is_disbanded = models.BooleanField(default=False) #是否被解散
 
+class ChatGroupMembership(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    chat_group = models.ForeignKey(ChatGroup, on_delete=models.CASCADE)
+    joined_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'chat_group']
 
 # class EditingMembers(models.Model):
 #     document = models.OneToOneField(Document,on_delete=models.CASCADE)

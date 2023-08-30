@@ -21,19 +21,112 @@ from .serializers import MessageSerializer, DirectMessageSerializer
 from django.db.models import Q
 from Core.models import User
 
-def search_group_messages(request, team_id):
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from Core.models import Team
+
+class GetChatGroupUsers(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self,request,group_id):
+        try:
+            chatgroup = ChatGroup.objects.get(pk=group_id)
+            users = chatgroup.members.all()
+            user_data = [{"id":user.id,"username":user.name} for user in users]
+            return Response({"users": user_data}, status=status.HTTP_200_OK)
+
+        except ChatGroup.DoesNotExist:
+            return Response({"error": "ChatGroup not found."}, status=status.HTTP_404_NOT_FOUND)
+class CreateChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        team = get_object_or_404(Team, id=request.data.get("team_id"))
+
+        # Check if the user is a member of the team
+        if request.user not in team.users.all():  # Assuming Team model has a ManyToMany relationship with User called 'members'
+            return Response({"detail": "User is not a member of this team."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check if a chat group with the same name already exists in the team
+        chat_group_name = request.data.get("name")
+        if ChatGroup.objects.filter(team=team, name=chat_group_name).exists():
+            return Response({"detail": "A chat group with this name already exists in the team."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        chat_group = ChatGroup.objects.create(
+            name=chat_group_name,
+            group_manager=request.user,
+            team=team,
+            is_defalut_chatgroup=False
+        )
+        chat_group.members.add(request.user)
+        return Response({"detail": "Chat group created."}, status=status.HTTP_201_CREATED)
+
+
+class InviteToChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        chat_group = get_object_or_404(ChatGroup, id=kwargs.get("chat_group_id"))
+
+        if chat_group.is_defalut_chatgroup:
+            return Response({"detail": "Default chat groups cannot invite new members."}, status=status.HTTP_403_FORBIDDEN)
+
+        if chat_group.group_manager != request.user:
+            return Response({"detail": "Only the group manager can invite users."}, status=status.HTTP_403_FORBIDDEN)
+
+        user_to_invite = get_object_or_404(User, id=request.data.get("user_id"))
+        chat_group.members.add(user_to_invite)
+        return Response({"detail": "User invited."}, status=status.HTTP_200_OK)
+
+class DisbandChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        chat_group = get_object_or_404(ChatGroup, id=kwargs.get("chat_group_id"))
+
+        if chat_group.is_defalut_chatgroup:
+            return Response({"detail": "Default chat groups cannot be disbanded."}, status=status.HTTP_403_FORBIDDEN)
+
+        if chat_group.group_manager != request.user:
+            return Response({"detail": "Only the group manager can disband the chat group."}, status=status.HTTP_403_FORBIDDEN)
+
+        chat_group.is_disbanded = True
+        chat_group.save()
+        return Response({"detail": "Chat group disbanded."}, status=status.HTTP_200_OK)
+
+class LeaveChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        chat_group = get_object_or_404(ChatGroup, id=kwargs.get("chat_group_id"))
+
+        if chat_group.is_defalut_chatgroup:
+            return Response({"detail": "Cannot leave default chat groups."}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.user not in chat_group.members.all():
+            return Response({"detail": "User is not a member of this chat group."}, status=status.HTTP_400_BAD_REQUEST)
+        if chat_group.is_disbanded == True:
+            return Response({"detail": "Chat group has been disbanded."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user == chat_group.group_manager:
+            return Response({"detail": "Group manager cannot leave group."}, status=status.HTTP_400_BAD_REQUEST)
+        chat_group.members.remove(request.user)
+        return Response({"detail": "Successfully left the chat group."}, status=status.HTTP_200_OK)
+
+def search_group_messages(request, group_id):
     if request.method == 'GET':
         keyword = request.GET.get('keyword', '')
 
-        if not team_id:
+        if not group_id:
             return HttpResponseBadRequest("team_id parameter is required.")
         if not keyword:
-            chat_group = ChatGroup.objects.get(team_id=team_id)
+            chat_group = ChatGroup.objects.get(pk=group_id)
             messages = Message.objects.filter(group=chat_group)
             data = [message_to_dict(message) for message in messages]
             return JsonResponse(data, safe=False)
         try:
-            chat_group = ChatGroup.objects.get(team_id=team_id)
+            chat_group = ChatGroup.objects.get(pk=group_id)
             messages = Message.objects.filter(group=chat_group, content__icontains=keyword)
             data = [message_to_dict(message) for message in messages]
             return JsonResponse(data, safe=False)
@@ -87,11 +180,11 @@ class UploadFileView(APIView):
             return Response({'detail': 'File not provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
         file = request.FILES['file']
-        team_id = request.data.get('team_id', None)
+        group_id = request.data.get('group_id', None)
         receiver_id = request.data.get('receiver_id', None)
 
-        if team_id:  # Save to Message table
-            group_id = ChatGroup.objects.get(team_id=team_id).id
+        if group_id:  # Save to Message table
+            # group_id = ChatGroup.objects.get(team_id=team_id).id
             message = Message(
                 sender=request.user,
                 file=file,
@@ -133,11 +226,12 @@ class UploadImageView(APIView):
             return Response({'detail': 'Image not provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
         image = request.FILES['image']
-        team_id = request.data.get('team_id', None)
+        # !
+        group_id = request.data.get('group_id', None)
         receiver_id = request.data.get('receiver_id', None)
 
-        if team_id:  # Save to Message table
-            group_id = ChatGroup.objects.get(team_id=team_id).id
+        if group_id:  # Save to Message table
+            # group_id = ChatGroup.objects.get(team_id=team_id).id
             message = Message(
                 sender=request.user,
                 image=image,
@@ -173,18 +267,18 @@ class MessagePagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 1000
 
-# /chat_messages/?team_id=1&page=2
+# /chat_messages/?group_id=1&page=2
 class ChatMessageListView(ListAPIView):
     serializer_class = MessageSerializer
     pagination_class = MessagePagination
 
     def get_queryset(self):
         permission_classes = [AllowAny]
-        team_id = self.kwargs.get('team_id')
+        group_id = self.kwargs.get('group_id')
         # 提供一个时间范围内的消息筛选功能, 不必须存在
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
-        group_id = ChatGroup.objects.get(team_id=team_id).id
+        # group_id = ChatGroup.objects.get(pk=group_id).id
         queryset = Message.objects.filter(group_id=group_id).order_by('timestamp')
 
         if start_date:

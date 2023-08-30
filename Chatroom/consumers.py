@@ -162,7 +162,7 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
 # 群聊
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.team_id = self.scope['url_route']['kwargs']['team_id']
+        self.team_id = self.scope['url_route']['kwargs']['group_id']
         self.group_name = "chat_" + str(self.team_id)
 
         # Extract token from query string
@@ -271,7 +271,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def save_text_message(self, content):
         from Chatroom.models import Message, ChatGroup
 
-        chat_group = ChatGroup.objects.get(team_id=self.team_id)
+        chat_group = ChatGroup.objects.get(pk=self.team_id)
 
         return Message.objects.create(
             sender=self.scope["user"],
@@ -319,9 +319,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_all_users(self):
         from Core.models import Team
-        team = Team.objects.get(pk=self.scope['url_route']['kwargs']['team_id'])
-        return list(team.users.all())  # 将查询集转换为列表
-
+        from Chatroom.models import ChatGroup
+        chatgroup= ChatGroup.objects.get(pk=self.scope['url_route']['kwargs']['group_id'])
+        if chatgroup.group_manager is None:# 说明是默认群聊
+            team_id = chatgroup.team_id
+            team = Team.objects.get(pk=team_id)
+            return list(team.users.all())  # 将查询集转换为列表
+        # 非默认群聊, 通过ChatGroup获取所有成员, 返回
+        else:
+            return list(chatgroup.members.all())
     async def send_notification(self, user, message_content):
         # 使用channel layer广播通知
         await self.create_notification(user, message_content)  # 添加了await

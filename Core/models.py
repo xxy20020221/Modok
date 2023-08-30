@@ -41,7 +41,6 @@ class Team(models.Model):
     # viewer_permission = models.CharField(max_length=100,choices=permission_choices,blank=True)
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=1000)
-
 class Task(models.Model):
     # users = models.ManyToManyField(User, through='UserTask')
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='team',blank=True,null=True)
