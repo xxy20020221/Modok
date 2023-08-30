@@ -21,6 +21,84 @@ from .serializers import MessageSerializer, DirectMessageSerializer
 from django.db.models import Q
 from Core.models import User
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from Core.models import Team
+class CreateChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        team = get_object_or_404(Team, id=request.data.get("team_id"))
+
+        # Check if the user is a member of the team
+        if request.user not in team.users.all():  # Assuming Team model has a ManyToMany relationship with User called 'members'
+            return Response({"detail": "User is not a member of this team."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check if a chat group with the same name already exists in the team
+        chat_group_name = request.data.get("name")
+        if ChatGroup.objects.filter(team=team, name=chat_group_name).exists():
+            return Response({"detail": "A chat group with this name already exists in the team."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        chat_group = ChatGroup.objects.create(
+            name=chat_group_name,
+            group_manager=request.user,
+            team=team,
+            is_defalut_chatgroup=False
+        )
+        chat_group.members.add(request.user)
+        return Response({"detail": "Chat group created."}, status=status.HTTP_201_CREATED)
+
+
+class InviteToChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        chat_group = get_object_or_404(ChatGroup, id=kwargs.get("chat_group_id"))
+
+        if chat_group.is_defalut_chatgroup:
+            return Response({"detail": "Default chat groups cannot invite new members."}, status=status.HTTP_403_FORBIDDEN)
+
+        if chat_group.group_manager != request.user:
+            return Response({"detail": "Only the group manager can invite users."}, status=status.HTTP_403_FORBIDDEN)
+
+        user_to_invite = get_object_or_404(User, id=request.data.get("user_id"))
+        chat_group.members.add(user_to_invite)
+        return Response({"detail": "User invited."}, status=status.HTTP_200_OK)
+
+class DisbandChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        chat_group = get_object_or_404(ChatGroup, id=kwargs.get("chat_group_id"))
+
+        if chat_group.is_defalut_chatgroup:
+            return Response({"detail": "Default chat groups cannot be disbanded."}, status=status.HTTP_403_FORBIDDEN)
+
+        if chat_group.group_manager != request.user:
+            return Response({"detail": "Only the group manager can disband the chat group."}, status=status.HTTP_403_FORBIDDEN)
+
+        chat_group.is_disbanded = True
+        chat_group.save()
+        return Response({"detail": "Chat group disbanded."}, status=status.HTTP_200_OK)
+
+class LeaveChatGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, *args, **kwargs):
+        chat_group = get_object_or_404(ChatGroup, id=kwargs.get("chat_group_id"))
+
+        if chat_group.is_defalut_chatgroup:
+            return Response({"detail": "Cannot leave default chat groups."}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.user not in chat_group.members.all():
+            return Response({"detail": "User is not a member of this chat group."}, status=status.HTTP_400_BAD_REQUEST)
+
+        chat_group.members.remove(request.user)
+        return Response({"detail": "Successfully left the chat group."}, status=status.HTTP_200_OK)
+
 def search_group_messages(request, team_id):
     if request.method == 'GET':
         keyword = request.GET.get('keyword', '')
