@@ -33,7 +33,7 @@ gender_choices = [
 ]
 class User(AbstractUser):
     phone_number = models.CharField(max_length=11, null=True, blank=True)
-    gender = models.CharField(max_length=10,choices=gender_choices)
+    gender = models.CharField(max_length=10,choices=gender_choices,null=True,blank=True)
     avatar = models.ImageField(upload_to='avatar/', null=True, blank=True)
 
 class Team(models.Model):
