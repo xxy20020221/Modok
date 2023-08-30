@@ -75,6 +75,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     task_id = serializers.IntegerField(write_only=True)
     creater_id = serializers.IntegerField(write_only=True)
+    last_editor_id = serializers.IntegerField(write_only=True)
     class Meta:
         model = Document
         fields = '__all__'

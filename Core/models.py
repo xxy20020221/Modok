@@ -26,8 +26,15 @@ write_permission_choices = [
     ('1','team'),
     ('2','all'),
 ]
+
+gender_choices = [
+    ('male','male'),
+    ('female','female'),
+]
 class User(AbstractUser):
     phone_number = models.CharField(max_length=11, null=True, blank=True)
+    gender = models.CharField(max_length=10,choices=gender_choices)
+    avatar = models.ImageField(upload_to='avatar/', null=True, blank=True)
 
 class Team(models.Model):
     users = models.ManyToManyField(User, through='TeamMembership')
