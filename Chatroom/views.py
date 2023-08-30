@@ -95,23 +95,26 @@ class LeaveChatGroupView(APIView):
 
         if request.user not in chat_group.members.all():
             return Response({"detail": "User is not a member of this chat group."}, status=status.HTTP_400_BAD_REQUEST)
-
+        if chat_group.is_disbanded == True:
+            return Response({"detail": "Chat group has been disbanded."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user == chat_group.group_manager:
+            return Response({"detail": "Group manager cannot leave group."}, status=status.HTTP_400_BAD_REQUEST)
         chat_group.members.remove(request.user)
         return Response({"detail": "Successfully left the chat group."}, status=status.HTTP_200_OK)
 
-def search_group_messages(request, team_id):
+def search_group_messages(request, group_id):
     if request.method == 'GET':
         keyword = request.GET.get('keyword', '')
 
-        if not team_id:
+        if not group_id:
             return HttpResponseBadRequest("team_id parameter is required.")
         if not keyword:
-            chat_group = ChatGroup.objects.get(team_id=team_id)
+            chat_group = ChatGroup.objects.get(pk=group_id)
             messages = Message.objects.filter(group=chat_group)
             data = [message_to_dict(message) for message in messages]
             return JsonResponse(data, safe=False)
         try:
-            chat_group = ChatGroup.objects.get(team_id=team_id)
+            chat_group = ChatGroup.objects.get(pk=group_id)
             messages = Message.objects.filter(group=chat_group, content__icontains=keyword)
             data = [message_to_dict(message) for message in messages]
             return JsonResponse(data, safe=False)
@@ -165,11 +168,11 @@ class UploadFileView(APIView):
             return Response({'detail': 'File not provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
         file = request.FILES['file']
-        team_id = request.data.get('team_id', None)
+        group_id = request.data.get('group_id', None)
         receiver_id = request.data.get('receiver_id', None)
 
-        if team_id:  # Save to Message table
-            group_id = ChatGroup.objects.get(team_id=team_id).id
+        if group_id:  # Save to Message table
+            # group_id = ChatGroup.objects.get(team_id=team_id).id
             message = Message(
                 sender=request.user,
                 file=file,
@@ -211,11 +214,12 @@ class UploadImageView(APIView):
             return Response({'detail': 'Image not provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
         image = request.FILES['image']
-        team_id = request.data.get('team_id', None)
+        # !
+        group_id = request.data.get('group_id', None)
         receiver_id = request.data.get('receiver_id', None)
 
-        if team_id:  # Save to Message table
-            group_id = ChatGroup.objects.get(team_id=team_id).id
+        if group_id:  # Save to Message table
+            # group_id = ChatGroup.objects.get(team_id=team_id).id
             message = Message(
                 sender=request.user,
                 image=image,
@@ -251,18 +255,18 @@ class MessagePagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 1000
 
-# /chat_messages/?team_id=1&page=2
+# /chat_messages/?group_id=1&page=2
 class ChatMessageListView(ListAPIView):
     serializer_class = MessageSerializer
     pagination_class = MessagePagination
 
     def get_queryset(self):
         permission_classes = [AllowAny]
-        team_id = self.kwargs.get('team_id')
+        group_id = self.kwargs.get('group_id')
         # 提供一个时间范围内的消息筛选功能, 不必须存在
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
-        group_id = ChatGroup.objects.get(team_id=team_id).id
+        # group_id = ChatGroup.objects.get(pk=group_id).id
         queryset = Message.objects.filter(group_id=group_id).order_by('timestamp')
 
         if start_date:
