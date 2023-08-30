@@ -82,14 +82,17 @@ class DocumentSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         task_id = validated_data.pop('task_id')  # Extract team_id from validated_data
         creater_id = validated_data.pop('creater_id')
+        last_editor_id = validated_data.pop('last_editor_id')
         document = Document(**validated_data)
         
         if task_id is not None:
             try:
                 task = Task.objects.get(id=task_id)
                 creater = User.objects.get(id=creater_id)
+                last_editor = User.objects.get(id=last_editor_id)
                 document.task = task
                 document.creater = creater
+                document.last_editor = last_editor
             
             except Task.DoesNotExist:
                 pass  # Handle the case when team_id doesn't correspond to a valid Team
