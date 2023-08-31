@@ -217,6 +217,8 @@ class InviteView(viewsets.ModelViewSet):
             return Response({"message":"user already exists"}, status=status.HTTP_400_BAD_REQUEST)
         else:
             temp = TeamMembership.objects.create(user=user,team=team,role='Viewer',permission='r')
+            default_chat_group = ChatGroup.objects.get(team=team, is_defalut_chatgroup=True)
+            ChatGroupMembership.objects.create(user=user, chat_group=default_chat_group)
             print(TeamMembershipSerializer(temp).data)
             return Response(TeamMembershipSerializer(temp).data, status=200)
 

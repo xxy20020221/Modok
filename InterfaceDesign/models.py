@@ -13,14 +13,8 @@ class Page(models.Model):
     last_modified = models.DateTimeField(auto_now=True)
 
 class Component(models.Model):
-    COMPONENT_CHOICES = [
-        ('button', 'Button'),
-        ('textbox', 'Textbox'),
-
-    ]
-
     page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='components')
-    component_type = models.CharField(max_length=50, choices=COMPONENT_CHOICES)
+    component_type = models.CharField(max_length=50)
     name = models.CharField(max_length=200)
     x_position = models.IntegerField()  # X轴位置
     y_position = models.IntegerField()  # Y轴位置

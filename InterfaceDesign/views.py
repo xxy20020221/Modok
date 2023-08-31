@@ -171,9 +171,12 @@ class ComponentDetail(APIView):
 
     def put(self, request, team_id, task_id, page_id, component_id):
         component = self.get_object(team_id, task_id, page_id, component_id)
-        data = request.data.copy()
-        data['page'] = page_id  # 添加 page_id 到数据中
-        serializer = ComponentSerializer(component, data=data)
+
+        # 动态地设置序列化器字段为非必需
+        serializer = ComponentSerializer(component, data=request.data, partial=True)
+        for field_name in serializer.fields:
+            serializer.fields[field_name].required = False
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
