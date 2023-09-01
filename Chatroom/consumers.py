@@ -251,6 +251,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = await self.get_message_by_id(message_content, Message.IMAGE)
         elif message_type == Message.FILE:
             message = await self.get_message_by_id(message_content, Message.FILE)
+            print("OK")
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -306,7 +307,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def get_message_by_id(self, content_id, message_type):
         from Chatroom.models import Message
         relative_image_path = content_id.split('/media/')[-1]
-        return Message.objects.get(image= relative_image_path, message_type=message_type)
+        print("KKKKK")
+        print(relative_image_path)
+        print(message_type)
+        return Message.objects.get(content= relative_image_path, message_type=message_type)
 
     @database_sync_to_async
     def save_text_message(self, content):
@@ -503,8 +507,8 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
     def get_direct_message_by_id(self, content_id, message_type):
         from Chatroom.models import Message
         relative_image_path = content_id.split('/media/')[-1]
-        print(content_id)
-        print(relative_image_path)
+        # print(content_id)
+        # print(relative_image_path)
         return DirectMessage.objects.get(content=relative_image_path, message_type=message_type)
     @database_sync_to_async
     def save_text_message(self, content):
