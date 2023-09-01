@@ -111,6 +111,12 @@ class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def post(self,request):
+        avatar = request.FILES.get("avatar") if "avatar" in request.FILES else None
+        user = request.user
+        user.avatar = avatar
+        user.save()
+
     def get(self, request):
         """
         获取当前认证用户的详细信息。
@@ -127,7 +133,7 @@ class UserDetailView(APIView):
         }
         return Response(data, status=status.HTTP_200_OK)
 
-    def put(self, request):
+    def patch(self, request):
         """
         更新当前认证用户的详细信息。
         """
@@ -137,6 +143,7 @@ class UserDetailView(APIView):
         phone_number = request.data.get("phone_number")
         gender = request.data.get("gender")
         avatar = request.FILES.get("avatar") if "avatar" in request.FILES else None
+        description = request.data.get("description")
 
         if password:
             user.set_password(password)
@@ -148,6 +155,8 @@ class UserDetailView(APIView):
             user.gender = gender
         if avatar:
             user.avatar = avatar
+        if description:
+            user.description = description
 
         user.save()
         return Response({"message": "success"}, status=status.HTTP_200_OK)
@@ -615,6 +624,14 @@ class RecycleBinView(APIView):
                 directories[item] = dir_files
 
         return JsonResponse({"filenames": files, "directories": directories}, status=200)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def print_data(request):
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    print(request.data)
+    document = Document.objects.filter(id = request.data.get('document_id')).first()
+    return JsonResponse({"allowed": True,"document_path":document.document_path}, status=200)
 
 
 

@@ -19,6 +19,7 @@ from .views import (
     list_directories_and_documents_for_task,
     restore_from_recycle_bin,
     RecycleBinView,
+    print_data,
 )
 
 app_name = 'core'
@@ -39,7 +40,8 @@ urlpatterns = [
     path('listallchatrooms/',list_all_chatrooms,name='listallchatrooms'),
     path('listalldocuments/',list_directories_and_documents_for_task,name='listalldocuments'),
     path('listrecyclebin/',RecycleBinView.as_view(),name='listrecyclebin'),
-    path('restore/',restore_from_recycle_bin,name='restore')
+    path('restore/',restore_from_recycle_bin,name='restore'),
+    path('print_data/',print_data,name='print_data')
 
 ]+router.urls
 

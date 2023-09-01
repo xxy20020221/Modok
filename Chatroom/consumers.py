@@ -6,7 +6,7 @@ from channels.layers import get_channel_layer
 from channels.db import database_sync_to_async
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import AnonymousUser
-
+from django.utils import timezone
 from Chatroom.models import DirectMessage
 
 
@@ -48,14 +48,38 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
         # If user is authenticated, proceed with the connection, else close the connection
         if self.scope['user'].is_authenticated:
             await self.redis.sadd(self.group_name, self.scope['user'].id)
+            group_size = await self.redis.scard(self.group_name)
             await self.channel_layer.group_add(
                 self.group_name,
                 self.channel_name
             )
             await self.accept()
+            if group_size == 1:
+                document_content = await self.get_document_content(self.document_id)
+                self.send(text_data=json.dumps({
+                    'message_type':'text',
+                    'content': document_content,
+                    'cursor_position_x':0,
+                    'cursor_position_y':0,
+                    'username':user,
+                    'user_id':user.id,
+                    'time':timezone.now(),  #!!!!
+                }))
+
+                
+
         else:
             # logger.error(f"WebSocket connection rejected for user: {self.scope['user']}")  # 添加日志记录
             await self.close()
+
+    async def get_document_content(self, document_id):
+        from Core.models import Document
+        document_path = await database_sync_to_async(Document.objects.get)(id=document_id)
+        with open(document_path) as f:
+            content = f.read()
+            f.close()
+            return content
+        
 
     async def get_editing_users(self):
         users = await self.redis.smembers(self.group_name)
@@ -78,19 +102,29 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
         await self.redis.close()
 
     async def save_document_changes(self):
+        from Chatroom.models import EditMessage,Document
+        document = Document.objects.get(pk=self.document_id)
+        recent_commands = EditMessage.objects.filter(
+            editor=self.scope["user"],
+            document=document,
+        ).order_by('-timestamp')[0]
+        with open(document.document_path) as f:
+            f.write(recent_commands.content)
+            f.close()
         await self.send(text_data=json.dumps({
-        'message': 'finished'
-    }))
+            'message': 'finished'
+        }))
 
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
 
         message_type = text_data_json['type']
         message_content = text_data_json['content']
-        cursor_position = text_data_json['cursor_position']
+        cursor_position_x = text_data_json['cursor_position_x']
+        cursor_position_y = text_data_json['cursor_position_y']
 
 
-        message = await self.save_text_message(message_content,cursor_position)
+        message = await self.save_text_message(message_content,cursor_position_x,cursor_position_y)
 
         await self.channel_layer.group_send(
             self.group_name,
@@ -98,7 +132,8 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
                 'type': 'chat_message',
                 'message_type': message_type,
                 'content': message_content,  # This is either text or the ID for file/image.
-                'cursor_position':cursor_position,
+                'cursor_position_x':cursor_position_x,
+                'cursor_position_y':cursor_position_y,
                 # 'message_id': message.id,
                 'username': self.scope['user'].username,
                 'user_id':self.scope['user'].id,
@@ -112,12 +147,14 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
         username = event['username']
         user_id = event['user_id']
         time = event['time']
-        cursor_position = event['cursor_position']
+        cursor_position_x = event['cursor_position_x']
+        cursor_position_y = event['cursor_position_y']
         # 发送消息到WebSocket
         await self.send(text_data=json.dumps({
             'message_type': message_type,
             'content': message,
-            'cursor_position':cursor_position,
+            'cursor_position_x':cursor_position_x,
+            'cursor_position_y':cursor_position_y,
             'username':username,
             'user_id':user_id,
             'time':time,
@@ -125,7 +162,7 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
 
     #对于每个文档，只保留每个用户的前10条记录
     @database_sync_to_async
-    def save_text_message(self, content,cursor_position):
+    def save_text_message(self, content,cursor_position_x,cursor_position_y):
         from Chatroom.models import EditMessage,Document
 
         document = Document.objects.get(pk=self.document_id)
@@ -139,7 +176,8 @@ class LiveEditingConsumer(AsyncWebsocketConsumer):
         new_message = EditMessage(
             editor=self.scope["user"],
             content=content,
-            cursor_position=cursor_position,
+            cursor_position_x=cursor_position_x,
+            cursor_position_y=cursor_position_y,
             document=document,
         )
         
