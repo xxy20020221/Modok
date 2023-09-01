@@ -309,6 +309,7 @@ class DuplicateTask(APIView):
         task_data.pop('created_date',None)
         task_data.pop('task_permission',None)
         task_data['team_id']=team_id
+        print(task_data)
         serializer = TaskSerializer(data=task_data)
         
         if serializer.is_valid():
@@ -322,25 +323,63 @@ class DuplicateTask(APIView):
             #复制到数据库
             documents = Document.objects.filter(task_id=task_id)
             directories = Directory.objects.filter(task_id=task_id)
+
             for document in documents:
                 document_data = DocumentSerializer(document).data
                 document_data.pop('id',None)
-                dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id2)
+                dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2))
                 document_path = os.path.join(dir_path,''.join([document_data['document_name'],'.txt']))
                 document_data['document_path'] = document_path
+                document_data.pop('creater_name',None)
+                document_data.pop('last_editor_name',None)
+                document_data.pop('created_date',None)
+                document_data['creater_id']=document_data['creater']
+                document_data['directory_id']=document_data['directory']
+                document_data['last_editor_id']=document_data['last_editor']
+                document_data['task_id']=task_id2
+                print("doc data is ",document_data)
                 document2 = DocumentSerializer(data=document_data)
                 if document2.is_valid():
+                    print("doc data is valid!!!!!!!!!!!!!!!!!!!!")
                     document2.save()
-                    # return Response({"message":"success"}, status=200)
-                # raise PermissionDenied()
             for directory in directories:
                 directory_data = DirectorySerializer(directory).data
-                directory_data.pop('id',None)
-                dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id2)
+                dirid1 = directory_data.pop('id',None)
+                dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2))
                 directory_data['dir_path'] = os.path.join(dir_path,directory_data['dir_name'])
+                directory_data.pop('documents',None)
+                directory_data.pop('created_date',None)
+                directory_data['task_id']=task_id2
+                directory_data['creater_id']=directory_data['creater']
+                directory_data['last_editor_id']=directory_data['last_editor']
+                print("dir data is ",directory_data)
                 directory2 = DirectorySerializer(data=directory_data)
                 if directory2.is_valid():
-                    directory2.save()
+                    dirid2 = directory2.save()
+                    documents2 = Document.objects.filter(task_id=task_id2,directory_id=dirid1)
+                    for document in documents2:
+                        document_data = DocumentSerializer(document).data
+                        document_data.pop('id',None)
+                        dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2),directory_data['dir_name'])
+                        document_path = os.path.join(dir_path,''.join([document_data['document_name'],'.txt']))
+                        document_data['document_path'] = document_path
+                        document_data.pop('creater_name',None)
+                        document_data.pop('last_editor_name',None)
+                        document_data.pop('created_date',None)
+                        document_data['creater_id']=document_data['creater']
+                        document_data['directory_id']=dirid2
+                        document_data['last_editor_id']=document_data['last_editor']
+                        document_data['task_id']=task_id2
+                        print("doc data is ",document_data)
+                        document2 = DocumentSerializer(data=document_data)
+                        if document2.is_valid():
+                            # print("doc data is valid!!!!!!!!!!!!!!!!!!!!")
+                            document2.save()
+                    
+            
+                    # return Response({"message":"success"}, status=200)
+                # raise PermissionDenied()
+            
             return Response({"message":"success"}, status=200)
                     # return Response({"message":"success"}, status=200)
                 # raise PermissionDenied()
@@ -368,6 +407,13 @@ class TaskManage(viewsets.ModelViewSet):
             os.makedirs(dir_path,exist_ok=True)
             return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def list(self,request,team_id=None):
+        tasks = Task.objects.filter(team_id=team_id)
+        final_data = TaskSerializer(tasks, many=True).data
+        print("final_data is ",final_data)
+        return Response(final_data, status=200)
 
     
     #缺少正在编辑时的项目保护，即有人编辑时应该无法删除
