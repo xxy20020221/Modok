@@ -261,6 +261,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'username': self.scope['user'].username,
                 'user_id':self.scope['user'].id,
                 'time':message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'avatar': self.scope['user'].avatar.url if self.scope['user'].avatar else None
             }
         )
 
@@ -271,6 +272,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         username = event['username']
         user_id = event['user_id']
         time = event['time']
+        avatar = event['avatar']
         # 发送消息到WebSocket
         await self.send(text_data=json.dumps({
             'message_type': message_type,
@@ -278,6 +280,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'username':username,
             'user_id':user_id,
             'time':time,
+            'avatar':avatar,
         }))
 
     async def handle_mentions(self, content, message):
@@ -467,6 +470,7 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
                 'username': self.scope['user'].username,
                 'user_id': self.scope['user'].id,
                 'time': message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'avatar': self.scope['user'].avatar.url if self.scope['user'].avatar else None
             }
         )
 
@@ -476,6 +480,7 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
         content = event['content']
         user_id = event['user_id']
         time = event['time']
+        avatar = event['avatar']
         # 发送消息到WebSocket
         await self.send(text_data=json.dumps({
             'message_type': message_type,
@@ -483,6 +488,7 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
             'username': username,
             'user_id': user_id,
             'time': time,
+            'avatar':avatar
         }))
 
     @database_sync_to_async

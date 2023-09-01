@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import TaskList, TaskDetail, PageList, PageDetail, ComponentList, ComponentDetail, SetTaskShared, SetTaskPrivate
+from .views import TaskList, TaskDetail, PageList, PageDetail, ComponentList, ComponentDetail, SetTaskShared, \
+    SetTaskPrivate, GetTaskSharedStatus
 
 urlpatterns = [
     path('teams/<int:team_id>/tasks/', TaskList.as_view(), name='task-list'),
@@ -10,4 +11,5 @@ urlpatterns = [
     path('teams/<int:team_id>/tasks/<int:task_id>/pages/<int:page_id>/components/<int:component_id>/', ComponentDetail.as_view(), name='component-detail'),
     path('task/<int:task_id>/set_shared/', SetTaskShared.as_view(), name='set-task-shared'),
     path('task/<int:task_id>/set_private/', SetTaskPrivate.as_view(), name='set-task-private'),
+    path('task/<int:task_id>/is_shared/', GetTaskSharedStatus.as_view(), name='get-task-shared-status'),
 ]
