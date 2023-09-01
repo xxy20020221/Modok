@@ -593,7 +593,9 @@ def restore_from_recycle_bin(request):
                 task=task,
                 document_name=item_name,
                 expiration_date=expiration_date,
-                defaults={'document_path': target_path}
+                defaults={'document_path': target_path},
+                creater = request.user,
+                last_editor = request.user,
             )
             os.rename(recycle_path, target_path)
         elif os.path.isdir(recycle_path):
