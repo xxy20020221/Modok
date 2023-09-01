@@ -11,7 +11,7 @@ from django.utils.timezone import make_aware
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import F,Q,Subquery,OuterRef
 from django.shortcuts import get_object_or_404
-
+import time
 import string
 import os
 import shutil
@@ -387,15 +387,19 @@ def list_directories_and_documents_for_task(request):
     # Fetch directories for the task
     directories = Directory.objects.filter(task=task)
     directory_serializer = DirectorySerializer(directories, many=True)
+    print(directory_serializer.data)
+    for directory in directory_serializer.data:
+        directory['is_dir']=True
     
     # Fetch direct documents for the task (those not in any directory)
     documents = Document.objects.filter(task=task, directory__isnull=True)
     document_serializer = DocumentSerializer(documents, many=True)
+    for document in document_serializer.data:
+        document['is_dir']=True
+
+    final_data = directory_serializer.data + document_serializer.data
     
-    return Response({
-        "directories": directory_serializer.data,
-        "documents": document_serializer.data
-    }, status=200)
+    return Response({"files":final_data}, status=200)
     
 
 class DirectoryManage(viewsets.ModelViewSet):
@@ -606,7 +610,8 @@ def restore_from_recycle_bin(request):
 class RecycleBinView(APIView):
     permission_classes=[IsAuthenticated]
 
-    def get(self, request):
+    @extract_team_id_and_check_permission(type_param='Member')
+    def get(self, request,team_id=None):
         # 设定recycle目录的路径
         recycle_path = os.path.join(os.path.abspath('.'), 'recycle')
 
@@ -616,20 +621,40 @@ class RecycleBinView(APIView):
 
         # 获取目录下所有文件的文件名（排除目录）
         files = []
-        directories = {}
 
         # 遍历recycle目录下的内容
         for item in os.listdir(recycle_path):
             item_path = os.path.join(recycle_path, item)
+            item_time = time.ctime(os.path.getmtime(item_path))
             # 如果是文件，直接添加到filenames列表
             if os.path.isfile(item_path):
-                files.append(item)
+
+                files.append({"file_name":item,"last_modified":item_time,"is_dir":False})
             # 如果是目录，添加到directories字典，并列出目录中的文件
             elif os.path.isdir(item_path):
-                dir_files = [f for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
-                directories[item] = dir_files
+                dir_files = [{"file_name":f,"last_modified":time.ctime(os.path.getmtime(os.path.join(item_path, f))),"is_dir":False} for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
+                files.append({"file_name":item,"last_modified":item_time,"is_dir":True,"files":dir_files})
 
-        return JsonResponse({"filenames": files, "directories": directories}, status=200)
+        return JsonResponse({"files": files}, status=200)
+    
+    @extract_team_id_and_check_permission(type_param='Member')
+    @action(detail=False, methods=['delete'])
+    def delete(self, request,team_id = None):
+        # 设定recycle目录的路径
+        recycle_path = os.path.join(os.path.abspath('.'), 'recycle',team_id)
+
+        # 检查目录是否存在
+        if not os.path.exists(recycle_path):
+            return JsonResponse({"message": "Recycle bin does not exist."}, status=404)
+
+        # 删除目录
+        shutil.rmtree(recycle_path)
+
+        return JsonResponse({"message": "Recycle bin successfully emptied."}, status=200)
+
+    
+
+
     
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
