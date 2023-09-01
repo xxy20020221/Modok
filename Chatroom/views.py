@@ -194,7 +194,8 @@ def message_to_dict(message):
         "content": message.content,
         "username": message.sender.username,
         "user_id": message.sender.id,
-        "time": message.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        "time": message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        "avatar": message.sender.avatar.url,
     }
 
 
