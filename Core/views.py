@@ -321,6 +321,7 @@ class DuplicateTask(APIView):
             copy_contents(dir_path,dest_path)
             #复制到数据库
             documents = Document.objects.filter(task_id=task_id)
+            directories = Directory.objects.filter(task_id=task_id)
             for document in documents:
                 document_data = DocumentSerializer(document).data
                 document_data.pop('id',None)
@@ -330,8 +331,19 @@ class DuplicateTask(APIView):
                 document2 = DocumentSerializer(data=document_data)
                 if document2.is_valid():
                     document2.save()
-                    return Response({"message":"success"}, status=200)
-                raise PermissionDenied()
+                    # return Response({"message":"success"}, status=200)
+                # raise PermissionDenied()
+            for directory in directories:
+                directory_data = DirectorySerializer(directory).data
+                directory_data.pop('id',None)
+                dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id2)
+                directory_data['dir_path'] = os.path.join(dir_path,directory_data['dir_name'])
+                directory2 = DirectorySerializer(data=directory_data)
+                if directory2.is_valid():
+                    directory2.save()
+            return Response({"message":"success"}, status=200)
+                    # return Response({"message":"success"}, status=200)
+                # raise PermissionDenied()
         raise PermissionDenied()
 
 
