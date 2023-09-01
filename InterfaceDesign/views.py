@@ -19,6 +19,8 @@ class DesignManage(viewsets.ModelViewSet):
     def create(self,request,team_id=None):
         task_id = request.META.get('HTTP_TASKID')
         request.data['task_id']=task_id
+        request.data['creater_id']=request.user.id
+        request.data['last_editor_id']=request.user.id
         dir_id = None
         serializer = DesignSerializer(data=request.data)
         if serializer.is_valid(): 
