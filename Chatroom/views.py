@@ -27,6 +27,11 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from Core.models import Team
 
+class GetUserAvatar(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, user_id):
+        user = User.objects.get(pk=user_id)
+        return Response({"avatar":user.avatar.url if user.avatar else None})
 class GetChatGroupUsers(APIView):
     permission_classes = [IsAuthenticated]
     def get(self,request,group_id):

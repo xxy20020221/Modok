@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import ChatMessageListView, search_group_messages, search_direct_messages, \
-    UploadFileView, UploadImageView, GetChatGroupUsers, GetChatGroupByTeamID
+    UploadFileView, UploadImageView, GetChatGroupUsers, GetChatGroupByTeamID, GetUserAvatar
 from . import views
 from .views import CreateChatGroupView, InviteToChatGroupView, DisbandChatGroupView, LeaveChatGroupView
 
@@ -18,4 +18,5 @@ urlpatterns = [
     path('chatroom/leave_group/<int:chat_group_id>/', LeaveChatGroupView.as_view(), name='leave_chat_group'),
     path('chatroom/group/<int:group_id>/users/', GetChatGroupUsers.as_view(), name='chat_group_users'),
     path('chatroom/team/<int:team_id>/chatgroups/', GetChatGroupByTeamID.as_view(), name='chat_groups_by_team'),
+    path('chatroom/getavatar/<int:user_id>/',GetUserAvatar.as_view(), name="get_avatar")
 ]

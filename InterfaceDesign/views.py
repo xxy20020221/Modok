@@ -7,7 +7,17 @@ from .models import Task, Page, Component
 from .serializers import TaskSerializer, PageSerializer, ComponentSerializer
 from django.shortcuts import get_object_or_404
 
+class GetTaskSharedStatus(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
+        team = task.team
+
+        if request.user not in team.users.all():
+            return Response({"detail": "Not authorized to view this task."}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response({"is_shared": task.is_shared}, status=status.HTTP_200_OK)
 class SetTaskShared(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -111,7 +121,9 @@ class PageDetail(APIView):
 
     def put(self, request, team_id, task_id, page_id):
         page = self.get_object(team_id, task_id, page_id)
-        serializer = PageSerializer(page, data=request.data)
+        data = request.data.copy()
+        data['task'] = task_id  # 添加 task_id 到数据中
+        serializer = PageSerializer(page, data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -189,23 +201,4 @@ class ComponentDetail(APIView):
 
 from rest_framework.exceptions import NotFound
 
-class PageDetail(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def get_object(self, team_id, task_id, page_id):
-        try:
-            task = Task.objects.get(pk=task_id, team_id=team_id)
-            page = Page.objects.get(pk=page_id, task=task)
-            return page
-        except Page.DoesNotExist:
-            raise NotFound("Page not found.")
-
-    def put(self, request, team_id, task_id, page_id):
-        page = self.get_object(team_id, task_id, page_id)
-        data = request.data.copy()
-        data['task'] = task_id  # 添加 task_id 到数据中
-        serializer = PageSerializer(page, data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
