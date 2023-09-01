@@ -116,6 +116,8 @@ class UserDetailView(APIView):
         user = request.user
         user.avatar = avatar
         user.save()
+        return Response({"message":"success"}, status=status.HTTP_200_OK)
+
 
     def get(self, request):
         """
@@ -395,7 +397,7 @@ def list_directories_and_documents_for_task(request):
     documents = Document.objects.filter(task=task, directory__isnull=True)
     document_serializer = DocumentSerializer(documents, many=True)
     for document in document_serializer.data:
-        document['is_dir']=True
+        document['is_dir']=False
 
     final_data = directory_serializer.data + document_serializer.data
     
@@ -542,7 +544,7 @@ def list_all_chatrooms(request):
         return Response([ChatGroupSerializer(chatgroup).data for chatgroup in chatgroups], status=200)
     raise PermissionDenied()
 
-def restore_directory_files(directory,task, root_path, target_dir_path,expiration_date):
+def restore_directory_files(directory,task, root_path, target_dir_path,expiration_date,creater,last_editor):
     """递归地恢复文件夹中的文件，并在数据库中为每一个文件创建/更新记录"""
 
     for item_name in os.listdir(root_path):
@@ -556,6 +558,8 @@ def restore_directory_files(directory,task, root_path, target_dir_path,expiratio
                 document_name=item_name,
                 directory=directory,
                 expiration_date=expiration_date,
+                creater=creater,
+                last_editor = last_editor,
                 defaults={'document_path': current_target_path}
             )
         
@@ -593,16 +597,16 @@ def restore_from_recycle_bin(request):
                 task=task,
                 document_name=item_name,
                 expiration_date=expiration_date,
-                defaults={'document_path': target_path},
                 creater = request.user,
                 last_editor = request.user,
+                defaults={'document_path': target_path},
             )
             os.rename(recycle_path, target_path)
         elif os.path.isdir(recycle_path):
             # 移动整个目录
             
-            directory = Directory.objects.create(task=task, dir_name=item_name,dir_path = target_path,expiration_date=expiration_date)
-            restore_directory_files(directory,task, recycle_path, target_path,expiration_date)
+            directory = Directory.objects.create(task=task, dir_name=item_name,dir_path = target_path,expiration_date=expiration_date,creater=request.user,last_editor=request.user)
+            restore_directory_files(directory,task, recycle_path, target_path,expiration_date,request.user,request.user)
             shutil.move(recycle_path, target_path)
 
         return JsonResponse({"message": "Item successfully restored."}, status=200)
@@ -615,7 +619,7 @@ class RecycleBinView(APIView):
     @extract_team_id_and_check_permission(type_param='Member')
     def get(self, request,team_id=None):
         # 设定recycle目录的路径
-        recycle_path = os.path.join(os.path.abspath('.'), 'recycle')
+        recycle_path = os.path.join(os.path.abspath('.'), 'recycle',team_id)
 
         # 检查目录是否存在
         if not os.path.exists(recycle_path):
