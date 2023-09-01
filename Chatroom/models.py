@@ -39,7 +39,8 @@ class ChatGroupMembership(models.Model):
 
 class EditMessage(models.Model):
     content = models.TextField()
-    cursor_position = models.IntegerField()
+    cursor_position_x = models.IntegerField()
+    cursor_position_y = models.IntegerField()
     timestamp = models.DateTimeField(auto_now_add=True)
     editor = models.ForeignKey(User, on_delete=models.CASCADE)
     document = models.ForeignKey(Document, on_delete=models.CASCADE,null=True)

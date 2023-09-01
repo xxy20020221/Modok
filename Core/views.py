@@ -111,6 +111,12 @@ class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def post(self,request):
+        avatar = request.FILES.get("avatar") if "avatar" in request.FILES else None
+        user = request.user
+        user.avatar = avatar
+        user.save()
+
     def get(self, request):
         """
         获取当前认证用户的详细信息。
@@ -127,7 +133,7 @@ class UserDetailView(APIView):
         }
         return Response(data, status=status.HTTP_200_OK)
 
-    def put(self, request):
+    def patch(self, request):
         """
         更新当前认证用户的详细信息。
         """
@@ -137,6 +143,7 @@ class UserDetailView(APIView):
         phone_number = request.data.get("phone_number")
         gender = request.data.get("gender")
         avatar = request.FILES.get("avatar") if "avatar" in request.FILES else None
+        description = request.data.get("description")
 
         if password:
             user.set_password(password)
@@ -148,6 +155,8 @@ class UserDetailView(APIView):
             user.gender = gender
         if avatar:
             user.avatar = avatar
+        if description:
+            user.description = description
 
         user.save()
         return Response({"message": "success"}, status=status.HTTP_200_OK)
@@ -430,7 +439,7 @@ class DirectoryManage(viewsets.ModelViewSet):
         if not directory:
             return Response({"message": "directory not found"}, status=status.HTTP_400_BAD_REQUEST)
         dir_path = os.path.join(os.path.abspath('.'), 'data', 'documents', team_id, task_id, directory.dir_name)
-        recycle_path = os.path.join(os.path.abspath('.'), 'recycle',directory.dir_name)
+        recycle_path = os.path.join(os.path.abspath('.'), 'recycle',team_id,directory.dir_name)
         move_files_recursively(dir_path,recycle_path)
 
         directory.delete()
@@ -463,7 +472,8 @@ class DocumentManage(viewsets.ModelViewSet):
         if serializer.is_valid(): 
             serializer.save()
             os.makedirs(dir_path,exist_ok=True)
-            with open(document_path,'w'):
+            with open(document_path,'w') as f:
+                f.write('{"ops":[{"insert":"Hi!"}]}')
                 pass
             return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
@@ -492,7 +502,7 @@ class DocumentManage(viewsets.ModelViewSet):
         #移入垃圾桶
         dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id)
         document_path = os.path.join(dir_path,''.join([document_name,'.txt']))
-        recycle_path = os.path.join(os.path.abspath('.'),'recycle')
+        recycle_path = os.path.join(os.path.abspath('.'),'recycle',team_id)
         os.makedirs(recycle_path,exist_ok=True)
         move_file(document_path,recycle_path)
 
@@ -551,43 +561,46 @@ def restore_directory_files(directory,task, root_path, target_dir_path,expiratio
 def restore_from_recycle_bin(request):
     # 获取从POST请求传递的数据
     task_id = request.META.get('HTTP_TASKID')
-    item_name = request.data.get('item_name')  # 此处为文件或目录名
-    expiration_date = request.data.get('expiration_date')
-    # 根据task_id查找任务，确保任务存在
-    task = get_object_or_404(Task, pk=task_id)
+    team_id = request.META.get('HTTP_TEAMID')
+    if TeamMembership.objects.filter(user=request.user,team_id=team_id):
+        item_name = request.data.get('item_name')  # 此处为文件或目录名
+        expiration_date = request.data.get('expiration_date')
+        # 根据task_id查找任务，确保任务存在
+        task = get_object_or_404(Task, pk=task_id)
 
-    # 构建原始和目标路径
-    recycle_path = os.path.join(os.path.abspath('.'), 'recycle', item_name)
-    target_path = os.path.join(os.path.abspath('.'), 'data', 'documents', str(task.team.id), str(task_id), item_name)
+        # 构建原始和目标路径
+        recycle_path = os.path.join(os.path.abspath('.'), 'recycle',team_id, item_name)
+        target_path = os.path.join(os.path.abspath('.'), 'data', 'documents', str(task.team.id), str(task_id), item_name)
 
-    # 检查条目是否存在于回收站中
-    if not os.path.exists(recycle_path):
-        return JsonResponse({"message": "Item not found in recycle bin."}, status=404)
+        # 检查条目是否存在于回收站中
+        if not os.path.exists(recycle_path):
+            return JsonResponse({"message": "Item not found in recycle bin."}, status=404)
 
 
-    if os.path.isfile(recycle_path):
-        target_dir = os.path.dirname(target_path)
-        os.makedirs(target_dir, exist_ok=True)
+        if os.path.isfile(recycle_path):
+            target_dir = os.path.dirname(target_path)
+            os.makedirs(target_dir, exist_ok=True)
 
-    # 检查是文件还是目录
-    if os.path.isfile(recycle_path):
-        
-        # 更新或创建Document记录
-        document, created = Document.objects.update_or_create(
-            task=task,
-            document_name=item_name,
-            expiration_date=expiration_date,
-            defaults={'document_path': target_path}
-        )
-        os.rename(recycle_path, target_path)
-    elif os.path.isdir(recycle_path):
-        # 移动整个目录
-        
-        directory = Directory.objects.create(task=task, dir_name=item_name,dir_path = target_path,expiration_date=expiration_date)
-        restore_directory_files(directory,task, recycle_path, target_path,expiration_date)
-        shutil.move(recycle_path, target_path)
+        # 检查是文件还是目录
+        if os.path.isfile(recycle_path):
+            
+            # 更新或创建Document记录
+            document, created = Document.objects.update_or_create(
+                task=task,
+                document_name=item_name,
+                expiration_date=expiration_date,
+                defaults={'document_path': target_path}
+            )
+            os.rename(recycle_path, target_path)
+        elif os.path.isdir(recycle_path):
+            # 移动整个目录
+            
+            directory = Directory.objects.create(task=task, dir_name=item_name,dir_path = target_path,expiration_date=expiration_date)
+            restore_directory_files(directory,task, recycle_path, target_path,expiration_date)
+            shutil.move(recycle_path, target_path)
 
-    return JsonResponse({"message": "Item successfully restored."}, status=200)
+        return JsonResponse({"message": "Item successfully restored."}, status=200)
+    raise PermissionDenied()
 
 
 class RecycleBinView(APIView):
@@ -617,6 +630,12 @@ class RecycleBinView(APIView):
                 directories[item] = dir_files
 
         return JsonResponse({"filenames": files, "directories": directories}, status=200)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def print_data(request):
+    document = Document.objects.filter(id = request.data.get('document_id')).first()
+    return JsonResponse({"allowed": True,"document_path":document.document_path}, status=200)
 
 
 

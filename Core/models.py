@@ -84,7 +84,6 @@ class Document(models.Model):
     read_code = models.CharField(max_length=100,blank=True,null=True)
 
 
-
 class TeamMembership(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     team = models.ForeignKey(Team, on_delete=models.CASCADE)
