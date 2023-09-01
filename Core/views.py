@@ -16,11 +16,13 @@ import string
 import os
 import shutil
 from Chatroom.models import ChatGroup,ChatGroupMembership
+from InterfaceDesign.models import Design
 from .models import User,Task,TeamMembership,Team,Document,Directory
 from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer,DirectorySerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
 from .support import move_files,move_file,move_files_recursively,copy_contents
 from Chatroom.serializers import ChatGroupSerializer
+from InterfaceDesign.serializers import DesignSerializer
 
 from rest_framework import generics,viewsets,permissions,status
 from rest_framework.generics import CreateAPIView
@@ -447,17 +449,21 @@ def list_directories_and_documents_for_task(request):
     # Fetch directories for the task
     directories = Directory.objects.filter(task=task)
     directory_serializer = DirectorySerializer(directories, many=True)
-    print(directory_serializer.data)
     for directory in directory_serializer.data:
-        directory['is_dir']=True
+        directory['is_dir']='1'
     
     # Fetch direct documents for the task (those not in any directory)
     documents = Document.objects.filter(task=task, directory__isnull=True)
     document_serializer = DocumentSerializer(documents, many=True)
     for document in document_serializer.data:
-        document['is_dir']=False
+        document['is_dir']='0'
 
-    final_data = directory_serializer.data + document_serializer.data
+    designs = Design.objects.filter(task=task)
+    design_serializer = DesignSerializer(designs, many=True)
+    for design in design_serializer.data:
+        design['is_dir']='2'
+
+    final_data = directory_serializer.data + document_serializer.data + design_serializer.data
     
     return Response({"files":final_data}, status=200)
     
@@ -693,11 +699,11 @@ class RecycleBinView(APIView):
             # 如果是文件，直接添加到filenames列表
             if os.path.isfile(item_path):
 
-                files.append({"file_name":item,"last_modified":item_time,"is_dir":False})
+                files.append({"file_name":item,"last_modified":item_time,"is_dir":'0'})
             # 如果是目录，添加到directories字典，并列出目录中的文件
             elif os.path.isdir(item_path):
-                dir_files = [{"file_name":f,"last_modified":time.ctime(os.path.getmtime(os.path.join(item_path, f))),"is_dir":False} for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
-                files.append({"file_name":item,"last_modified":item_time,"is_dir":True,"files":dir_files})
+                dir_files = [{"file_name":f,"last_modified":time.ctime(os.path.getmtime(os.path.join(item_path, f))),"is_dir":'0'} for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
+                files.append({"file_name":item,"last_modified":item_time,"is_dir":'1',"files":dir_files})
 
         return JsonResponse({"files": files}, status=200)
     

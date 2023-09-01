@@ -2,10 +2,49 @@ from django.http import Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from .models import Task, Page, Component
-from .serializers import TaskSerializer, PageSerializer, ComponentSerializer
+from rest_framework import generics,viewsets,permissions,status
+
+from .models import Task, Page, Component,Design
+from .serializers import TaskSerializer, PageSerializer, ComponentSerializer,DesignSerializer
 from django.shortcuts import get_object_or_404
+from rest_framework.decorators import action,api_view,permission_classes
+from Core.views import extract_team_id_and_check_permission
+
+class DesignManage(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = Design.objects.all()
+    serializer_class = DesignSerializer
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def create(self,request,team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        request.data['task_id']=task_id
+        dir_id = None
+        serializer = DesignSerializer(data=request.data)
+        if serializer.is_valid(): 
+            serializer.save()
+            return Response({"message":"success"}, status=200)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def list(self,request,team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        designs = Design.objects.filter(task_id=task_id)
+        final_data = DesignSerializer(designs,many=True).data
+        return Response(final_data,status=200)
+    
+    @extract_team_id_and_check_permission(type_param='Member')
+    @action(detail=False, methods=['delete'])
+    def delete(self,request,team_id=None):
+        task_id = request.META.get('HTTP_TASKID')
+        design_id = request.query_params.get('design_id')
+        designs = Design.objects.filter(id=design_id).first()
+        if not designs:
+            return Response({"message":"design not found"}, status=status.HTTP_400_BAD_REQUEST)
+        designs.delete()
+        return Response({"message":"success"}, status=200)
+    
+
 
 class GetTaskSharedStatus(APIView):
     permission_classes = [IsAuthenticated]
