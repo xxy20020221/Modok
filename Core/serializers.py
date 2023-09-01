@@ -27,14 +27,18 @@ class TeamMembershipSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     user_info = ShortUserSerializer(source='user',read_only=True)
     role = serializers.CharField(read_only=True)
+    avatar = serializers.SerializerMethodField(read_only=True)
 
 
     class Meta:
         model = TeamMembership
-        fields = ['user_id','team_id','user_info','username','role']
+        fields = ['user_id','team_id','user_info','username','role','avatar']
 
     def get_username(self,obj):
         return obj.user.username
+    
+    def get_avatar(self,obj):
+        return obj.user.avatar.url
 
 class AvatarUploadSerializer(serializers.Serializer):
     avatar = serializers.ImageField()
