@@ -294,12 +294,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             for user in users:
                 await self.send_notification(user, content)
         else:
-            # 查找特定的@用户
+            # 查找特定的@用户 @AB
             users = await self.get_all_users()
             for user in users:
                 username = user.username
                 print("ALL username"+username)
-                if f"@{username}" in content:
+                if f"@{username} " in content:
                     print("username"+username)
                     mention = await self.create_mention(message, user, Mention.SPECIFIC_USER)
                     await self.send_notification(user, content)
