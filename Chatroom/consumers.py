@@ -242,6 +242,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message_type = text_data_json['type']
         message_content = text_data_json['content']
 
+
         if message_type == Message.TEXT:
             message = await self.save_text_message(message_content)
             # 检查是否有@符号
@@ -499,8 +500,6 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
     def get_message_by_id(self, content_id, message_type):
         from Chatroom.models import Message
         relative_image_path = content_id.split('/media/')[-1]
-        print(content_id)
-        print( relative_image_path)
         return Message.objects.get(content=relative_image_path, message_type=message_type)
 
     @database_sync_to_async

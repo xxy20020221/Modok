@@ -69,9 +69,16 @@ class TaskDetail(APIView):
         except Task.DoesNotExist:
             raise NotFound("Task not found.")
 
+    def get(self, request, team_id, task_id):
+        task = self.get_object(team_id, task_id)
+        serializer = TaskSerializer(task)
+        return Response(serializer.data)
+
     def put(self, request, team_id, task_id):
         task = self.get_object(team_id, task_id)
-        serializer = TaskSerializer(task, data=request.data)
+        serializer = TaskSerializer(task, data=request.data, partial=True)
+        for field_name in serializer.fields:
+            serializer.fields[field_name].required = False
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
