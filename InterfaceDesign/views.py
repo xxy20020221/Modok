@@ -1,5 +1,5 @@
 from django.http import Http404
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics,viewsets,permissions,status
@@ -11,7 +11,7 @@ from rest_framework.decorators import action,api_view,permission_classes
 from Core.views import extract_team_id_and_check_permission
 
 class DesignManage(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     queryset = Design.objects.all()
     serializer_class = DesignSerializer
 
@@ -50,41 +50,41 @@ class DesignManage(viewsets.ModelViewSet):
 
 class GetTaskSharedStatus(APIView):
     permission_classes = [IsAuthenticated]
-
+    # 外部的参数不必改, 这样方便一点
     def get(self, request, task_id):
-        task = get_object_or_404(Task, id=task_id)
-        team = task.team
+        design = get_object_or_404(Design, id=task_id)
+        team = design.task.team
 
         if request.user not in team.users.all():
             return Response({"detail": "Not authorized to view this task."}, status=status.HTTP_403_FORBIDDEN)
 
-        return Response({"is_shared": task.is_shared}, status=status.HTTP_200_OK)
+        return Response({"is_shared": design.is_shared}, status=status.HTTP_200_OK)
 class SetTaskShared(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, task_id):
-        task = get_object_or_404(Task, id=task_id)
-        team = task.team
+        design = get_object_or_404(Design, id=task_id)
+        team = design.task.team
 
         if request.user not in team.users.all():
             return Response({"detail": "Not authorized to modify this task."}, status=status.HTTP_403_FORBIDDEN)
 
-        task.is_shared = True
-        task.save()
+        design.is_shared = True
+        design.save()
         return Response({"detail": "Task is now shared."}, status=status.HTTP_200_OK)
 
 class SetTaskPrivate(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, task_id):
-        task = get_object_or_404(Task, id=task_id)
-        team = task.team
+        design = get_object_or_404(Design, id=task_id)
+        team = design.task.team
 
         if request.user not in team.users.all():
             return Response({"detail": "Not authorized to modify this task."}, status=status.HTTP_403_FORBIDDEN)
 
-        task.is_shared = False
-        task.save()
+        design.is_shared = False
+        design.save()
         return Response({"detail": "Task is now private."}, status=status.HTTP_200_OK)
 
 class TaskList(APIView):
@@ -133,20 +133,20 @@ class TaskDetail(APIView):
 class PageList(APIView):
 
     def get_permissions(self):
-        task = get_object_or_404(Task, id=self.kwargs['task_id'])
-        if task.is_shared:
+        design = get_object_or_404(Design, id=self.kwargs['task_id'])
+        if design.is_shared:
             return []
         return [IsAuthenticated()]
 
     def get(self, request, team_id, task_id):
-        pages = Page.objects.filter(task_id=task_id).order_by("last_modified")
+        pages = Page.objects.filter(design_id=task_id).order_by("last_modified")
         serializer = PageSerializer(pages, many=True)
         return Response(serializer.data)
 
     def post(self, request, team_id, task_id):
         # 将 url中的!!!task_id 添加到传入的数据中
         data = request.data.copy()
-        data['task'] = task_id
+        data['design'] = task_id
         serializer = PageSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -155,22 +155,22 @@ class PageList(APIView):
 class PageDetail(APIView):
 
     def get_permissions(self):
-        task = get_object_or_404(Task, id=self.kwargs['task_id'])
-        if task.is_shared:
+        design = get_object_or_404(Design, id=self.kwargs['task_id'])
+        if design.is_shared:
             return []
         return [IsAuthenticated()]
 
     def get_object(self, team_id, task_id, page_id):
         try:
-            task = Task.objects.get(pk=task_id, team_id=team_id)
-            return Page.objects.get(pk=page_id, task=task)
+            # design = Design.objects.get(pk=task_id)
+            return Page.objects.get(pk=page_id)
         except Page.DoesNotExist:
             raise NotFound("Page not found.")
 
     def put(self, request, team_id, task_id, page_id):
         page = self.get_object(team_id, task_id, page_id)
         data = request.data.copy()
-        data['task'] = task_id  # 添加 task_id 到数据中
+        data['design'] = task_id  # 添加 task_id 到数据中
         serializer = PageSerializer(page, data=data)
         if serializer.is_valid():
             serializer.save()
@@ -186,8 +186,8 @@ class ComponentList(APIView):
 
 
     def get_permissions(self):
-        task = get_object_or_404(Task, id=self.kwargs['task_id'])
-        if task.is_shared:
+        design = get_object_or_404(Design, id=self.kwargs['task_id'])
+        if design.is_shared:
             return []
         return [IsAuthenticated()]
 
@@ -210,14 +210,14 @@ class ComponentDetail(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, team_id, task_id, page_id, component_id):
-        try:
-            task = Task.objects.get(pk=task_id, team_id=team_id)
-        except Task.DoesNotExist:
-            print("Task not found")
-            raise Http404
+        # try:
+        #     task = Task.objects.get(pk=task_id, team_id=team_id)
+        # except Task.DoesNotExist:
+        #     print("Task not found")
+        #     raise Http404
 
         try:
-            page = Page.objects.get(pk=page_id, task=task)
+            page = Page.objects.get(pk=page_id)
         except Page.DoesNotExist:
             print("Page not found")
             raise Http404
