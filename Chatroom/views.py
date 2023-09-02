@@ -27,6 +27,64 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from Core.models import Team
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from Chatroom.models import Mention, Notification, User
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def document_notice(request):
+    # Get data from the request
+    content = request.data.get('content')
+    document_id = request.data.get('did')
+
+    message = None  # This will need to be replaced with an actual message instance or fetched
+
+    # If mentioning all users
+    if '@all' in content:
+        create_mention(message, None, Mention.ALL_USERS,document_id)
+        users = get_all_users()
+        for user in users:
+            send_notification(user, content)
+    else:
+        # Find specific mentioned users, e.g., @AB
+        users = get_all_users()
+        for user in users:
+            if f"@{user.username} " in content:
+                create_mention(message, user, Mention.SPECIFIC_USER)
+                send_notification(user, content)
+
+    return Response({"success": True}, status=200)
+
+
+def get_all_users():
+    return User.objects.all()
+
+
+def create_mention(message, user, mention_type,document_id):
+    mention = Mention(
+        message=message,
+        user=user,
+        mention_type=mention_type,
+        document_id=document_id  # This variable needs to be available here. Consider passing it as a parameter.
+    )
+    mention.save()
+    return mention
+
+
+def send_notification(user, content):
+    notification = Notification(
+        user=user,
+        message=f"You were mentioned in a document: {content}",
+        timestamp=timezone.now(),
+        is_read=False,
+        is_at=True
+    )
+    notification.save()
+
 class GetUserAvatar(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request, user_id):

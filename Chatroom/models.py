@@ -82,6 +82,7 @@ class Mention(models.Model):
     message = models.ForeignKey(Message, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # 如果是 "@" 所有人，这可以为空
     mention_type = models.CharField(max_length=10, choices=MENTION_TYPE_CHOICES)
+    document_id = models.IntegerField(null=True,blank=True)
 
 
 class Notification(models.Model):
