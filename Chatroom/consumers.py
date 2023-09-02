@@ -7,7 +7,7 @@ from channels.db import database_sync_to_async
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import AnonymousUser
 from django.utils import timezone
-from Chatroom.models import DirectMessage
+from Chatroom.models import DirectMessage, ChatGroup
 
 
 # import logging
@@ -287,9 +287,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def handle_mentions(self, content, message):
         from Chatroom.models import Mention
+        chatgroup = ChatGroup.objects.get(pk=self.team_id)
         # 如果@所有用户
         if '@all' in content:
-            mention = await self.create_mention(message, None, Mention.ALL_USERS)
+
+            mention = await self.create_mention(message, None, Mention.ALL_USERS, chatgroup.name)
             users = await self.get_all_users()
             for user in users:
                 await self.send_notification(user, content)
@@ -301,7 +303,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 print("ALL username"+username)
                 if f"@{username} " in content:
                     print("username"+username)
-                    mention = await self.create_mention(message, user, Mention.SPECIFIC_USER)
+                    mention = await self.create_mention(message, user, Mention.SPECIFIC_USER, chatgroup.name)
                     await self.send_notification(user, content)
 
     @database_sync_to_async
@@ -354,12 +356,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     @database_sync_to_async
-    def create_mention(self, message, user, mention_type):
+    def create_mention(self, message, user, mention_type,name):
         from Chatroom.models import Mention
         return Mention.objects.create(
             message=message,
             user=user,
-            mention_type=mention_type
+            mention_type=mention_type,
+            name=name
         )
 
     @database_sync_to_async
