@@ -346,7 +346,10 @@ class DuplicateTask(APIView):
                 document_data.pop('last_editor_name',None)
                 document_data.pop('created_date',None)
                 document_data['creater_id']=document_data['creater']
-                document_data['directory_id']=document_data['directory']
+                if not document_data['directory']:
+                    document_data.pop('diectory_id',None)
+                else:
+                    document_data['directory_id']=document_data['directory']
                 document_data['last_editor_id']=document_data['last_editor']
                 document_data['task_id']=task_id2
                 print("doc data is ",document_data)
@@ -370,24 +373,7 @@ class DuplicateTask(APIView):
                     dir2 = directory2.save()
                     dirid2= dir2.id
                     documents2 = Document.objects.filter(task_id=task_id2,directory_id=dirid1)
-                    for document in documents2:
-                        document_data = DocumentSerializer(document).data
-                        document_data.pop('id',None)
-                        dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2),directory_data['dir_name'])
-                        document_path = os.path.join(dir_path,''.join([document_data['document_name'],'.txt']))
-                        document_data['document_path'] = document_path
-                        document_data.pop('creater_name',None)
-                        document_data.pop('last_editor_name',None)
-                        document_data.pop('created_date',None)
-                        document_data['creater_id']=document_data['creater']
-                        document_data['directory_id']=dirid2
-                        document_data['last_editor_id']=document_data['last_editor']
-                        document_data['task_id']=task_id2
-                        print("doc data is ",document_data)
-                        document2 = DocumentSerializer(data=document_data)
-                        if document2.is_valid():
-                            # print("doc data is valid!!!!!!!!!!!!!!!!!!!!")
-                            document2.save()
+                    documents2.update(directory_id=dirid2)
                     
             
                     # return Response({"message":"success"}, status=200)
@@ -746,6 +732,7 @@ def print_data(request):
     return JsonResponse({"allowed": True,"document_path":document.document_path}, status=200)
 
 
+# 输入群聊id，返回群聊所有群成员和群主id
 
     
 
