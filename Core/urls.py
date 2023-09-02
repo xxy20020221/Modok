@@ -23,6 +23,7 @@ from .views import (
     add_editing_user,
     remove_editing_user,
     duplicate_template,
+    get_template,
 )
 
 app_name = 'core'
@@ -47,7 +48,8 @@ urlpatterns = [
     path('print_data/',print_data,name='print_data'),
     path('add_editing_user/',add_editing_user,name='add_editing_user'),
     path('remove_editing_user/',remove_editing_user,name='remove_editing_user'),
-    path('duplicate_template/',duplicate_template,name='duplicate_template')
+    path('duplicate_template/',duplicate_template,name='duplicate_template'),
+    path('get_template/',get_template,name='get_template'),
 
 ]+router.urls
 

@@ -762,6 +762,17 @@ def remove_editing_user(request):
         return JsonResponse({"message": "success"}, status=200)
     return JsonResponse({"message": "editing user not found"}, status=404)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_template(request):
+    templates = Document.objects.filter(task=None)
+    final_data = {'templates':[{'document_name':template.document_name,
+                              "document_path":template.document_path,
+                              "priority":template.priority,
+                              "created_date":template.created_date.strftime('%Y-%m-%d %H:%M:%S'),
+                              "expiration_date":template.expiration_date.strftime('%Y-%m-%d %H:%M:%S')} for template in templates]}
+    return JsonResponse(final_data,status=200)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
