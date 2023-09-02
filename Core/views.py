@@ -18,8 +18,8 @@ import os
 import shutil
 from Chatroom.models import ChatGroup,ChatGroupMembership
 from InterfaceDesign.models import Design
-from .models import User,Task,TeamMembership,Team,Document,Directory
-from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer,DirectorySerializer
+from .models import User,Task,TeamMembership,Team,Document,Directory,EditingUser
+from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer,DirectorySerializer,EdtingUserSerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
 from .support import move_files,move_file,move_files_recursively,copy_contents
 from Chatroom.serializers import ChatGroupSerializer
@@ -346,7 +346,10 @@ class DuplicateTask(APIView):
                 document_data.pop('last_editor_name',None)
                 document_data.pop('created_date',None)
                 document_data['creater_id']=document_data['creater']
-                document_data['directory_id']=document_data['directory']
+                if not document_data['directory']:
+                    document_data.pop('diectory_id',None)
+                else:
+                    document_data['directory_id']=document_data['directory']
                 document_data['last_editor_id']=document_data['last_editor']
                 document_data['task_id']=task_id2
                 print("doc data is ",document_data)
@@ -370,24 +373,7 @@ class DuplicateTask(APIView):
                     dir2 = directory2.save()
                     dirid2= dir2.id
                     documents2 = Document.objects.filter(task_id=task_id2,directory_id=dirid1)
-                    for document in documents2:
-                        document_data = DocumentSerializer(document).data
-                        document_data.pop('id',None)
-                        dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2),directory_data['dir_name'])
-                        document_path = os.path.join(dir_path,''.join([document_data['document_name'],'.txt']))
-                        document_data['document_path'] = document_path
-                        document_data.pop('creater_name',None)
-                        document_data.pop('last_editor_name',None)
-                        document_data.pop('created_date',None)
-                        document_data['creater_id']=document_data['creater']
-                        document_data['directory_id']=dirid2
-                        document_data['last_editor_id']=document_data['last_editor']
-                        document_data['task_id']=task_id2
-                        print("doc data is ",document_data)
-                        document2 = DocumentSerializer(data=document_data)
-                        if document2.is_valid():
-                            # print("doc data is valid!!!!!!!!!!!!!!!!!!!!")
-                            document2.save()
+                    documents2.update(directory_id=dirid2)
                     
             
                     # return Response({"message":"success"}, status=200)
@@ -419,14 +405,12 @@ class TaskManage(viewsets.ModelViewSet):
             dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,str(task_id))
             os.makedirs(dir_path,exist_ok=True)
             return Response({"message":"success"}, status=200)
-        print("serializer error is ",serializer.errors)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
     @extract_team_id_and_check_permission(type_param='Member')
     def list(self,request,team_id=None):
         tasks = Task.objects.filter(team_id=team_id)
         final_data = TaskSerializer(tasks, many=True).data
-        print("final_data is ",final_data)
         return Response(final_data, status=200)
 
     
@@ -746,6 +730,71 @@ def print_data(request):
     return JsonResponse({"allowed": True,"document_path":document.document_path}, status=200)
 
 
+# 输入群聊id，返回群聊所有群成员和群主id
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_editing_user(request):
+    user = request.user
+    document_id = request.data.get('document_id')
+    document = Document.objects.filter(id=document_id).first()
+    if document:
+        EditingUser.objects.create(users=user,document=document)
+        document.last_editor=user
+        document.status='editing'
+        document.save()
+        return JsonResponse({"message": "success"}, status=200)
+    return JsonResponse({"message": "document not found"}, status=404)
 
-    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_editing_user(request):
+    user = request.user
+    document_id = request.data.get('document_id')
+    document = Document.objects.filter(id=document_id).first()
+    editing_user = EditingUser.objects.filter(users=user,document=document).first()
+    editing_user_num = EditingUser.objects.filter(document=document).count()
+    if editing_user:
+        editing_user.delete()
+        if editing_user_num == 1:
+            document.last_editor=user
+            document.status='Completed'
+            document.save()
+        return JsonResponse({"message": "success"}, status=200)
+    return JsonResponse({"message": "editing user not found"}, status=404)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_template(request):
+    templates = Document.objects.filter(task=None)
+    final_data = {'templates':[{'document_name':template.document_name,
+                              "document_path":template.document_path,
+                              "priority":template.priority,
+                              "created_date":template.created_date.strftime('%Y-%m-%d %H:%M:%S'),
+                              "expiration_date":template.expiration_date.strftime('%Y-%m-%d %H:%M:%S')} for template in templates]}
+    return JsonResponse(final_data,status=200)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def duplicate_template(request):
+        team_id = request.META.get('HTTP_TEAMID')
+        task_id = request.META.get('HTTP_TASKID')
+        dir_id = request.META.get('HTTP_DIRID')
+        template_id = request.data.get('template_id')
+        template_name = request.data.get('template_name')
+        new_name = "_".join([template,"副本"])
+        if dir_id:
+            new_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id),str(dir_id))
+        else:
+            new_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id))
+        os.makedirs(new_path,exist_ok=True)
+        template = Document.objects.filter(Q(id=template_id)|Q(document_name=template_name)).first()
+        if template:
+            Document.objects.create(task_id=task_id,document_name=new_name,document_path=new_path,creater=request.user,last_editor=request.user)
+            shutil.copy(template.document_path,new_path)
+            return JsonResponse({"message": "success"}, status=200)
+        else:
+            return JsonResponse({"message": "template not found"}, status=404)
+           
+
 

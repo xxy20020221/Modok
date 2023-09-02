@@ -96,7 +96,9 @@ class GetChatGroupUsers(APIView):
         try:
             chatgroup = ChatGroup.objects.get(pk=group_id)
             users = chatgroup.members.all()
-            user_data = [{"id":user.id,"username":user.name} for user in users]
+            group_manager = chatgroup.group_manager
+            group_manager_data = [{"id":group_manager.id,"username":group_manager.username}]
+            user_data = group_manager_data+[{"id":user.id,"username":user.username} for user in users]
             return Response({"users": user_data}, status=status.HTTP_200_OK)
 
         except ChatGroup.DoesNotExist:

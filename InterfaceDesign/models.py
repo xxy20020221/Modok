@@ -11,6 +11,7 @@ class Design(models.Model):
     task_permission = models.CharField(max_length=100,choices=permission_choices,blank=True)
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=1000)
+    priority = models.IntegerField(blank=True,default=1)
     created_date = models.DateTimeField(auto_now_add=True)
     expiration_date = models.DateTimeField(blank=True,null=True)
     creater = models.ForeignKey(User,on_delete=models.CASCADE,related_name='design_creater',blank=True,null=True)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User,Task,TeamMembership,Team,Document,Directory
+from .models import User,Task,TeamMembership,Team,Document,Directory,EditingUser
 from datetime import datetime
 import string
 import os 
@@ -190,5 +190,14 @@ class DirectorySerializer(serializers.ModelSerializer):
     
     def get_last_editor_name(self,obj):
         return obj.last_editor.username
+
+class EdtingUserSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField(read_only=True)
+    class Meta:
+        model = EditingUser
+        fields = ['username']
+    
+    def get_username(self,obj):
+        return obj.users.username
 
 
