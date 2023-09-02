@@ -50,21 +50,12 @@ python-dateutil==2.8.2
 python-decouple==3.1
 pytz==2018.5
 redis==5.0.0
-requests==2.31.0
 service-identity==23.1.0
 six==1.16.0
-sockjs-tornado==1.0.7
-sqlparse==0.4.4
-SwampDragon==0.4.2.2
-tomli==2.0.1
-tomlkit==0.11.8
-tornado==6.3.3
-tornado-redis==2.4.18
-Twisted==22.10.0
 twisted-iocpsupport==1.0.4
 txaio==23.1.1
 typing_extensions==4.5.0
-tzdata @ file:///tmp/build/80754af9/python-tzdata_1611693927741/work
+tzdata==2023.3
 urllib3==1.24.2
 wincertstore==0.2
 wrapt==1.15.0
