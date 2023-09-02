@@ -58,6 +58,11 @@ class ShortTeamSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     # team = ShortTeamSerializer(read_only=True)
     team_id = serializers.IntegerField(write_only=True)
+    title = serializers.CharField()
+    created_date = serializers.DateTimeField(read_only=True,format="%Y-%m-%d %H:%M")
+    expiration_date = serializers.DateTimeField(format="%Y-%m-%d")
+    # description = serializers.CharField()
+    # expiration_date = serializers.DateTimeField()
     class Meta:
         model = Task
         fields = ['team_id','task_permission','title','description','expiration_date','created_date','id']
@@ -75,6 +80,12 @@ class TaskSerializer(serializers.ModelSerializer):
         
         task.save()
         return task
+    
+    # def get_created_date(self,obj):
+    #     return obj.created_date.strftime("%Y-%m-%d %H:%M")
+    
+    # def get_expiration_date(self,obj):
+    #     return obj.expiration_date.strftime("%Y-%m-%d %H:%M")
 
 
 
@@ -86,6 +97,8 @@ class DocumentSerializer(serializers.ModelSerializer):
     creater_name = serializers.SerializerMethodField(read_only=True)
     last_editor_name = serializers.SerializerMethodField(read_only=True)
     directory_id = serializers.IntegerField(write_only=True,required=False)
+    created_date = serializers.DateTimeField(read_only=True,format="%Y-%m-%d %H:%M")
+    expiration_date = serializers.DateTimeField(format="%Y-%m-%d")
     class Meta:
         model = Document
         fields = '__all__'
@@ -139,6 +152,8 @@ class DirectorySerializer(serializers.ModelSerializer):
     last_editor_id = serializers.IntegerField(write_only=True)
     creater_name = serializers.SerializerMethodField(read_only=True)
     last_editor_name = serializers.SerializerMethodField(read_only=True)
+    created_date = serializers.DateTimeField(read_only=True,format="%Y-%m-%d %H:%M")
+    expiration_date = serializers.DateTimeField(format="%Y-%m-%d")
 
     def create(self, validated_data):
         task_id = validated_data.pop('task_id')  # Extract team_id from validated_data

@@ -12,6 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import F,Q,Subquery,OuterRef
 from django.shortcuts import get_object_or_404
 import time
+from datetime import datetime
 import string
 import os
 import shutil
@@ -54,6 +55,9 @@ def extract_team_id_and_check_permission(type_param):
                 allowed_roles = ['Creater','Administrator','Viewer']
             if role in allowed_roles:
                 return view_func(view, request, *args, **kwargs)
+            else:
+                raise PermissionDenied()
+
         return _wrapped_view
     return decorator
 
@@ -127,6 +131,7 @@ class UserDetailView(APIView):
         """
         user = request.user
         data = {
+            "userid":user.id,
             "username": user.username,
             "email": user.email,
             "phone_number": user.phone_number,
@@ -173,12 +178,15 @@ class TeamManagerView(viewsets.ModelViewSet):
 
         serializer = TeamSerializer(data = request.data)
         if serializer.is_valid():
-            serializer.save()
+            team=serializer.save()
+            team_id = team.id
             TeamMembership.objects.create(user=request.user,team=serializer.instance,role='Creater',permission='rw')
             # Create a ChatGroup for the new Team
             chatgroup_name = serializer.instance.title + " Chat Group"  # You can modify this naming convention
             chatgroup = ChatGroup.objects.create(team=serializer.instance, name=chatgroup_name,group_manager=request.user,is_defalut_chatgroup=True)
             ChatGroupMembership.objects.create(user = request.user, chat_group = chatgroup)
+            dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id))
+            os.makedirs(dir_path,exist_ok=True)
 
             return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
@@ -202,6 +210,8 @@ class TeamManagerView(viewsets.ModelViewSet):
         team.delete()
         dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id)
         recycle_path = os.path.join(os.path.abspath('.'),'recycle',team_id)
+        os.makedirs(dir_path,exist_ok=True)
+        os.makedirs(recycle_path,exist_ok=True)
         move_files_recursively(dir_path,recycle_path)
         #改，缺少原型设计的储存路径
         return Response({"message":"success"}, status=200)
@@ -357,7 +367,8 @@ class DuplicateTask(APIView):
                 print("dir data is ",directory_data)
                 directory2 = DirectorySerializer(data=directory_data)
                 if directory2.is_valid():
-                    dirid2 = directory2.save()
+                    dir2 = directory2.save()
+                    dirid2= dir2.id
                     documents2 = Document.objects.filter(task_id=task_id2,directory_id=dirid1)
                     for document in documents2:
                         document_data = DocumentSerializer(document).data
@@ -408,6 +419,7 @@ class TaskManage(viewsets.ModelViewSet):
             dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,str(task_id))
             os.makedirs(dir_path,exist_ok=True)
             return Response({"message":"success"}, status=200)
+        print("serializer error is ",serializer.errors)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
     @extract_team_id_and_check_permission(type_param='Member')
@@ -450,6 +462,7 @@ def list_directories_and_documents_for_task(request):
     directories = Directory.objects.filter(task=task)
     directory_serializer = DirectorySerializer(directories, many=True)
     for directory in directory_serializer.data:
+        directory['document_count'] = len(directory['documents'])
         directory['is_dir']='1'
     
     # Fetch direct documents for the task (those not in any directory)
@@ -695,14 +708,14 @@ class RecycleBinView(APIView):
         # 遍历recycle目录下的内容
         for item in os.listdir(recycle_path):
             item_path = os.path.join(recycle_path, item)
-            item_time = time.ctime(os.path.getmtime(item_path))
+            item_time = datetime.fromtimestamp(os.path.getmtime(item_path)).strftime('%Y-%m-%d %H:%M')
             # 如果是文件，直接添加到filenames列表
             if os.path.isfile(item_path):
 
                 files.append({"file_name":item,"last_modified":item_time,"is_dir":'0'})
             # 如果是目录，添加到directories字典，并列出目录中的文件
             elif os.path.isdir(item_path):
-                dir_files = [{"file_name":f,"last_modified":time.ctime(os.path.getmtime(os.path.join(item_path, f))),"is_dir":'0'} for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
+                dir_files = [{"file_name":f,"last_modified":datetime.fromtimestamp(os.path.getmtime(os.path.join(item_path, f))).strftime('%Y-%m-%d %H:%M'),"is_dir":'0'} for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
                 files.append({"file_name":item,"last_modified":item_time,"is_dir":'1',"files":dir_files})
 
         return JsonResponse({"files": files}, status=200)
