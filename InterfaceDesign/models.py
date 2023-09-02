@@ -1,9 +1,26 @@
 from django.db import models
-from Core.models import Task
+from Core.models import Task,User
+permission_choices = [
+    ('r','Read_only'),
+    ('w','Write_only'),
+    ('rw','Read_and_Write'),
+]
+class Design(models.Model):
+    # users = models.ManyToManyField(User, through='UserTask')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='design_task',blank=True,null=True)
+    task_permission = models.CharField(max_length=100,choices=permission_choices,blank=True)
+    title = models.CharField(max_length=100)
+    description = models.CharField(max_length=1000)
+    created_date = models.DateTimeField(auto_now_add=True)
+    expiration_date = models.DateTimeField(blank=True,null=True)
+    creater = models.ForeignKey(User,on_delete=models.CASCADE,related_name='design_creater',blank=True,null=True)
+    last_editor = models.ForeignKey(User,on_delete=models.CASCADE,related_name='design_last_editor',blank=True,null=True)
+    is_shared = models.BooleanField(default=False)
+
 
 # Create your models here.
 class Page(models.Model):
-    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='pages')
+    design = models.ForeignKey(Design, on_delete=models.CASCADE, related_name='pages')
     name = models.CharField(max_length=200)
     background_color = models.CharField(max_length=7, default='#FFFFFF')  # 默认为白色
     image = models.ImageField(upload_to='interfaceDesign/page_images/',null=True)  # 保存铅笔轨迹的图片

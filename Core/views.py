@@ -16,11 +16,13 @@ import string
 import os
 import shutil
 from Chatroom.models import ChatGroup,ChatGroupMembership
+from InterfaceDesign.models import Design
 from .models import User,Task,TeamMembership,Team,Document,Directory
 from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer,DirectorySerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
 from .support import move_files,move_file,move_files_recursively,copy_contents
 from Chatroom.serializers import ChatGroupSerializer
+from InterfaceDesign.serializers import DesignSerializer
 
 from rest_framework import generics,viewsets,permissions,status
 from rest_framework.generics import CreateAPIView
@@ -116,6 +118,8 @@ class UserDetailView(APIView):
         user = request.user
         user.avatar = avatar
         user.save()
+        return Response({"message":"success"}, status=status.HTTP_200_OK)
+
 
     def get(self, request):
         """
@@ -307,6 +311,7 @@ class DuplicateTask(APIView):
         task_data.pop('created_date',None)
         task_data.pop('task_permission',None)
         task_data['team_id']=team_id
+        print(task_data)
         serializer = TaskSerializer(data=task_data)
         
         if serializer.is_valid():
@@ -319,17 +324,67 @@ class DuplicateTask(APIView):
             copy_contents(dir_path,dest_path)
             #复制到数据库
             documents = Document.objects.filter(task_id=task_id)
+            directories = Directory.objects.filter(task_id=task_id)
+
             for document in documents:
                 document_data = DocumentSerializer(document).data
                 document_data.pop('id',None)
-                dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,task_id2)
+                dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2))
                 document_path = os.path.join(dir_path,''.join([document_data['document_name'],'.txt']))
                 document_data['document_path'] = document_path
+                document_data.pop('creater_name',None)
+                document_data.pop('last_editor_name',None)
+                document_data.pop('created_date',None)
+                document_data['creater_id']=document_data['creater']
+                document_data['directory_id']=document_data['directory']
+                document_data['last_editor_id']=document_data['last_editor']
+                document_data['task_id']=task_id2
+                print("doc data is ",document_data)
                 document2 = DocumentSerializer(data=document_data)
                 if document2.is_valid():
+                    print("doc data is valid!!!!!!!!!!!!!!!!!!!!")
                     document2.save()
-                    return Response({"message":"success"}, status=200)
-                raise PermissionDenied()
+            for directory in directories:
+                directory_data = DirectorySerializer(directory).data
+                dirid1 = directory_data.pop('id',None)
+                dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2))
+                directory_data['dir_path'] = os.path.join(dir_path,directory_data['dir_name'])
+                directory_data.pop('documents',None)
+                directory_data.pop('created_date',None)
+                directory_data['task_id']=task_id2
+                directory_data['creater_id']=directory_data['creater']
+                directory_data['last_editor_id']=directory_data['last_editor']
+                print("dir data is ",directory_data)
+                directory2 = DirectorySerializer(data=directory_data)
+                if directory2.is_valid():
+                    dirid2 = directory2.save()
+                    documents2 = Document.objects.filter(task_id=task_id2,directory_id=dirid1)
+                    for document in documents2:
+                        document_data = DocumentSerializer(document).data
+                        document_data.pop('id',None)
+                        dir_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id2),directory_data['dir_name'])
+                        document_path = os.path.join(dir_path,''.join([document_data['document_name'],'.txt']))
+                        document_data['document_path'] = document_path
+                        document_data.pop('creater_name',None)
+                        document_data.pop('last_editor_name',None)
+                        document_data.pop('created_date',None)
+                        document_data['creater_id']=document_data['creater']
+                        document_data['directory_id']=dirid2
+                        document_data['last_editor_id']=document_data['last_editor']
+                        document_data['task_id']=task_id2
+                        print("doc data is ",document_data)
+                        document2 = DocumentSerializer(data=document_data)
+                        if document2.is_valid():
+                            # print("doc data is valid!!!!!!!!!!!!!!!!!!!!")
+                            document2.save()
+                    
+            
+                    # return Response({"message":"success"}, status=200)
+                # raise PermissionDenied()
+            
+            return Response({"message":"success"}, status=200)
+                    # return Response({"message":"success"}, status=200)
+                # raise PermissionDenied()
         raise PermissionDenied()
 
 
@@ -354,6 +409,13 @@ class TaskManage(viewsets.ModelViewSet):
             os.makedirs(dir_path,exist_ok=True)
             return Response({"message":"success"}, status=200)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
+    @extract_team_id_and_check_permission(type_param='Member')
+    def list(self,request,team_id=None):
+        tasks = Task.objects.filter(team_id=team_id)
+        final_data = TaskSerializer(tasks, many=True).data
+        print("final_data is ",final_data)
+        return Response(final_data, status=200)
 
     
     #缺少正在编辑时的项目保护，即有人编辑时应该无法删除
@@ -387,17 +449,21 @@ def list_directories_and_documents_for_task(request):
     # Fetch directories for the task
     directories = Directory.objects.filter(task=task)
     directory_serializer = DirectorySerializer(directories, many=True)
-    print(directory_serializer.data)
     for directory in directory_serializer.data:
-        directory['is_dir']=True
+        directory['is_dir']='1'
     
     # Fetch direct documents for the task (those not in any directory)
     documents = Document.objects.filter(task=task, directory__isnull=True)
     document_serializer = DocumentSerializer(documents, many=True)
     for document in document_serializer.data:
-        document['is_dir']=True
+        document['is_dir']='0'
 
-    final_data = directory_serializer.data + document_serializer.data
+    designs = Design.objects.filter(task=task)
+    design_serializer = DesignSerializer(designs, many=True)
+    for design in design_serializer.data:
+        design['is_dir']='2'
+
+    final_data = directory_serializer.data + document_serializer.data + design_serializer.data
     
     return Response({"files":final_data}, status=200)
     
@@ -542,7 +608,7 @@ def list_all_chatrooms(request):
         return Response([ChatGroupSerializer(chatgroup).data for chatgroup in chatgroups], status=200)
     raise PermissionDenied()
 
-def restore_directory_files(directory,task, root_path, target_dir_path,expiration_date):
+def restore_directory_files(directory,task, root_path, target_dir_path,expiration_date,creater,last_editor):
     """递归地恢复文件夹中的文件，并在数据库中为每一个文件创建/更新记录"""
 
     for item_name in os.listdir(root_path):
@@ -556,6 +622,8 @@ def restore_directory_files(directory,task, root_path, target_dir_path,expiratio
                 document_name=item_name,
                 directory=directory,
                 expiration_date=expiration_date,
+                creater=creater,
+                last_editor = last_editor,
                 defaults={'document_path': current_target_path}
             )
         
@@ -593,16 +661,16 @@ def restore_from_recycle_bin(request):
                 task=task,
                 document_name=item_name,
                 expiration_date=expiration_date,
-                defaults={'document_path': target_path},
                 creater = request.user,
                 last_editor = request.user,
+                defaults={'document_path': target_path},
             )
             os.rename(recycle_path, target_path)
         elif os.path.isdir(recycle_path):
             # 移动整个目录
             
-            directory = Directory.objects.create(task=task, dir_name=item_name,dir_path = target_path,expiration_date=expiration_date)
-            restore_directory_files(directory,task, recycle_path, target_path,expiration_date)
+            directory = Directory.objects.create(task=task, dir_name=item_name,dir_path = target_path,expiration_date=expiration_date,creater=request.user,last_editor=request.user)
+            restore_directory_files(directory,task, recycle_path, target_path,expiration_date,request.user,request.user)
             shutil.move(recycle_path, target_path)
 
         return JsonResponse({"message": "Item successfully restored."}, status=200)
@@ -615,7 +683,7 @@ class RecycleBinView(APIView):
     @extract_team_id_and_check_permission(type_param='Member')
     def get(self, request,team_id=None):
         # 设定recycle目录的路径
-        recycle_path = os.path.join(os.path.abspath('.'), 'recycle')
+        recycle_path = os.path.join(os.path.abspath('.'), 'recycle',team_id)
 
         # 检查目录是否存在
         if not os.path.exists(recycle_path):
@@ -631,11 +699,11 @@ class RecycleBinView(APIView):
             # 如果是文件，直接添加到filenames列表
             if os.path.isfile(item_path):
 
-                files.append({"file_name":item,"last_modified":item_time,"is_dir":False})
+                files.append({"file_name":item,"last_modified":item_time,"is_dir":'0'})
             # 如果是目录，添加到directories字典，并列出目录中的文件
             elif os.path.isdir(item_path):
-                dir_files = [{"file_name":f,"last_modified":time.ctime(os.path.getmtime(os.path.join(item_path, f))),"is_dir":False} for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
-                files.append({"file_name":item,"last_modified":item_time,"is_dir":True,"files":dir_files})
+                dir_files = [{"file_name":f,"last_modified":time.ctime(os.path.getmtime(os.path.join(item_path, f))),"is_dir":'0'} for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))]
+                files.append({"file_name":item,"last_modified":item_time,"is_dir":'1',"files":dir_files})
 
         return JsonResponse({"files": files}, status=200)
     
