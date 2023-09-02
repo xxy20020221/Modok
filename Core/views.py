@@ -18,8 +18,8 @@ import os
 import shutil
 from Chatroom.models import ChatGroup,ChatGroupMembership
 from InterfaceDesign.models import Design
-from .models import User,Task,TeamMembership,Team,Document,Directory
-from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer,DirectorySerializer
+from .models import User,Task,TeamMembership,Team,Document,Directory,EditingUser
+from .serializers import UserSerializer,TeamMembershipSerializer,TeamSerializer,DocumentSerializer,TaskSerializer,AvatarUploadSerializer,DirectorySerializer,EdtingUserSerializer
 from .permissions import IsAdministrater,IsTeamAdministrator,IsTeamCreater,IsTeamMember
 from .support import move_files,move_file,move_files_recursively,copy_contents
 from Chatroom.serializers import ChatGroupSerializer
@@ -405,14 +405,12 @@ class TaskManage(viewsets.ModelViewSet):
             dir_path = os.path.join(os.path.abspath('.'),'data','documents',team_id,str(task_id))
             os.makedirs(dir_path,exist_ok=True)
             return Response({"message":"success"}, status=200)
-        print("serializer error is ",serializer.errors)
         return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
     @extract_team_id_and_check_permission(type_param='Member')
     def list(self,request,team_id=None):
         tasks = Task.objects.filter(team_id=team_id)
         final_data = TaskSerializer(tasks, many=True).data
-        print("final_data is ",final_data)
         return Response(final_data, status=200)
 
     
@@ -733,6 +731,55 @@ def print_data(request):
 
 
 # 输入群聊id，返回群聊所有群成员和群主id
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_editing_user(request):
+    user = request.user
+    document_id = request.data.get('document_id')
+    document = Document.objects.filter(id=document_id).first()
+    if document:
+        EditingUser.objects.create(user=user,document=document)
+        document.update(last_editor=user,status='editing')
+        return JsonResponse({"message": "success"}, status=200)
+    return JsonResponse({"message": "document not found"}, status=404)
 
-    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_editing_user(request):
+    user = request.user
+    document_id = request.data.get('document_id')
+    document = Document.objects.filter(id=document_id).first()
+    editing_user = EditingUser.objects.filter(user=user,document=document).first()
+    editing_user_num = EditingUser.objects.filter(document=document).count()
+    if editing_user:
+        editing_user.delete()
+        if editing_user_num == 1:
+            document.update(last_editor=user,status='Completed')
+        return JsonResponse({"message": "success"}, status=200)
+    return JsonResponse({"message": "editing user not found"}, status=404)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def duplicate_template(request):
+        team_id = request.META.get('HTTP_TEAMID')
+        task_id = request.META.get('HTTP_TASKID')
+        dir_id = request.META.get('HTTP_DIRID')
+        template_id = request.data.get('template_id')
+        template_name = request.data.get('template_name')
+        new_name = "_".join([template,"副本"])
+        if dir_id:
+            new_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id),str(dir_id))
+        else:
+            new_path = os.path.join(os.path.abspath('.'),'data','documents',str(team_id),str(task_id))
+        os.makedirs(new_path,exist_ok=True)
+        template = Document.objects.filter(Q(id=template_id)|Q(document_name=template_name)).first()
+        if template:
+            Document.objects.create(task_id=task_id,document_name=new_name,document_path=new_path,creater=request.user,last_editor=request.user)
+            shutil.copy(template.document_path,new_path)
+            return JsonResponse({"message": "success"}, status=200)
+        else:
+            return JsonResponse({"message": "template not found"}, status=404)
+           
+
 

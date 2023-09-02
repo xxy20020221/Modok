@@ -17,9 +17,9 @@ permission_choices = [
 ]
 
 document_choices = [
-    ('1','Not Started'),
-    ('2','In Progress'),
-    ('3','Completed'),
+    ('Not Started','Not Started'),
+    ('In Progress','In Progress'),
+    ('Completed','Completed'),
 ]
 
 write_permission_choices = [
@@ -74,7 +74,7 @@ class Document(models.Model):
     document_name = models.CharField(max_length=100,blank=True)
     content = models.CharField(max_length=1000,blank=True,null=True)
     priority = models.IntegerField(blank=True,default=1)
-    status = models.CharField(max_length=100,choices=document_choices,blank=True)
+    status = models.CharField(max_length=100,choices=document_choices,blank=True,default='Not Started')
     expiration_date = models.DateTimeField()
     created_date = models.DateTimeField(auto_now_add=True)
     creater = models.ForeignKey(User,on_delete=models.CASCADE,related_name='creater',blank=True,null=True)
@@ -90,5 +90,9 @@ class TeamMembership(models.Model):
     role = models.CharField(max_length=100,choices=role_choices,blank=True)
     permission = models.CharField(choices=permission_choices, max_length=100,blank=True)
 
+
+class EditingUser(models.Model):
+    document = models.ForeignKey(Document,on_delete=models.CASCADE,blank=True,null=True)
+    users = models.ForeignKey(User,on_delete=models.CASCADE,blank=True,null=True)
 
 
