@@ -16,7 +16,7 @@ class ChatGroup(models.Model):
     name = models.CharField(max_length=200)
     is_defalut_chatgroup = models.BooleanField(default=True)
     group_manager = models.ForeignKey(User, on_delete=models.CASCADE, related_name="managed_groups", null=True, blank=True)
-    members = models.ManyToManyField(User, through='ChatGroupMembership', related_name="chat_groups",null=True, blank=True)
+    members = models.ManyToManyField(User, through='ChatGroupMembership', related_name="chat_groups", blank=True)
     is_disbanded = models.BooleanField(default=False) #是否被解散
 
 class ChatGroupMembership(models.Model):

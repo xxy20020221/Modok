@@ -738,8 +738,10 @@ def add_editing_user(request):
     document_id = request.data.get('document_id')
     document = Document.objects.filter(id=document_id).first()
     if document:
-        EditingUser.objects.create(user=user,document=document)
-        document.update(last_editor=user,status='editing')
+        EditingUser.objects.create(users=user,document=document)
+        document.last_editor=user
+        document.status='editing'
+        document.save()
         return JsonResponse({"message": "success"}, status=200)
     return JsonResponse({"message": "document not found"}, status=404)
 
@@ -749,12 +751,14 @@ def remove_editing_user(request):
     user = request.user
     document_id = request.data.get('document_id')
     document = Document.objects.filter(id=document_id).first()
-    editing_user = EditingUser.objects.filter(user=user,document=document).first()
+    editing_user = EditingUser.objects.filter(users=user,document=document).first()
     editing_user_num = EditingUser.objects.filter(document=document).count()
     if editing_user:
         editing_user.delete()
         if editing_user_num == 1:
-            document.update(last_editor=user,status='Completed')
+            document.last_editor=user
+            document.status='Completed'
+            document.save()
         return JsonResponse({"message": "success"}, status=200)
     return JsonResponse({"message": "editing user not found"}, status=404)
 
